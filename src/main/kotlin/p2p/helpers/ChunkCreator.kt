@@ -2,16 +2,11 @@ package p2p.helpers
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import p2p.domain.Chunk
-import p2p.domain.ChunkFilePath
-import p2p.domain.ChunkMetadata
-import p2p.domain.ChunkUserData
-import p2p.domain.FileId
+import p2p.domain.*
 import p2p.domain.FileId.Companion.FILE_ID_SIZE_BYTES
 import p2p.domain.FileId.Companion.HASH_SIZE_BYTES
 import p2p.domain.FileId.Companion.NUMBER_OF_CHUNKS_SIZE_BYTES
 import p2p.domain.FileId.Companion.USER_PUBLIC_KEY_SIZE_BYTES
-import p2p.domain.UserPublicKey
 import p2p.utils.convertMBToBytes
 import p2p.utils.toByteArray
 import p2p.utils.toInt
@@ -60,6 +55,13 @@ class ChunkCreator(
 
             return decrypt(finalChunkData.copyOfRange(headerSize, finalChunkData.size))
         }
+    }
+
+    suspend fun getChunks(fileId: FileId): List<Chunk> = withContext(Dispatchers.IO) {
+        File(chunkOutputPath).listFiles()
+            ?.filter { it.name.startsWith(fileId.toString()) }
+            ?.map { decodeChunk(it) }
+            ?: emptyList()
     }
 
     suspend fun mergeFileFromChunks(chunkFiles: List<File>): InputStream = withContext(Dispatchers.IO) {
