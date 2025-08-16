@@ -8,6 +8,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import p2p.utils.Logger
+import p2p.utils.LogLevel
 
 @Composable
 @Preview
@@ -77,15 +79,49 @@ fun LoginScreen() {
 
 // Placeholder functions for login logic
 fun login(username: String, password: String): Boolean {
+    Logger.info("Auth", "Login attempt for user: $username")
+    
     // TODO: Implement actual login logic
-    return false
+    val success = false
+    
+    if (success) {
+        Logger.info("Auth", "Login successful for user: $username")
+    } else {
+        Logger.warn("Auth", "Login failed for user: $username")
+    }
+    
+    return success
 }
 
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "LibraVault Login"
-    ) {
-        LoginScreen()
+fun main() {
+    try {
+        // Configure logger
+        Logger.setLogLevel(LogLevel.DEBUG)
+        
+        // Setup file logging with 10MB per file and 10 files max (100MB total)
+        Logger.configureFileLogging(
+            enabled = true,
+            directory = "logs",
+            maxFileSizeMB = 10,
+            maxFiles = 10
+        )
+        
+        Logger.info("App", "Starting LibraVault P2P Client")
+        
+        application {
+            Window(
+                onCloseRequest = {
+                    Logger.info("App", "Shutting down LibraVault P2P Client")
+                    Logger.shutdown() // Clean up file handles
+                    exitApplication()
+                },
+                title = "LibraVault Login"
+            ) {
+                LoginScreen()
+            }
+        }
+    } catch (e: Exception) {
+        Logger.error("App", "Fatal error during application startup", e)
+        throw e
     }
 }

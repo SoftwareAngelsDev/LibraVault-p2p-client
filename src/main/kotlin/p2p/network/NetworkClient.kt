@@ -6,6 +6,7 @@ import p2p.domain.Peer
 import p2p.network.messages.DoYouHaveThisChunkRequest
 import p2p.network.messages.DoYouHaveThisChunkResponse
 import p2p.network.messages.NetworkResponse
+import p2p.utils.Logger
 import java.io.File
 import java.io.IOException
 import java.security.SecureRandom
@@ -22,13 +23,18 @@ class NetworkClient {
     companion object {
         const val MAX_NUMBER_OF_CHUNK_BYTE_CHALLENGES = 5
         const val MINIMUM_REPUTATION_TO_BE_PEER = 0.1
+        private const val TAG = "NetworkClient"
     }
 
     private val knownPeers = ConcurrentHashMap<Peer, PeerInfo>()
 
     suspend fun whoHas(chunk: Chunk, timeoutSeconds: Int): Collection<Peer> = withContext(Dispatchers.IO) {
+        Logger.info(TAG, "Looking for peers who have chunk ${chunk.metadata.index} of file ${chunk.fileId}")
         val chunkFile = File(chunk.path)
         val doWeHaveTheFile = chunkFile.exists()
+        if (!doWeHaveTheFile) {
+            Logger.debug(TAG, "Local chunk file not found at ${chunk.path}")
+        }
 
         val challengePositions = if (doWeHaveTheFile) {
             val maxChallengePosition = File(chunk.path).length().toInt()
@@ -83,6 +89,7 @@ class NetworkClient {
                             return@async
                         } catch (e: Throwable) {
                             // Track errors with the specific peer
+                            Logger.error(TAG, "Error communicating with peer ${peer.host}:${peer.port}", e)
                             errors[peer] = e
                             return@async
                         }
@@ -125,12 +132,16 @@ class NetworkClient {
 
     private fun updatePeerReputation(peer: Peer, p: Punishment) {
         val oldInfo = knownPeers[peer] ?: return
-        knownPeers[peer] = PeerInfo(oldInfo.reputation * p.factor, System.currentTimeMillis())
+        val newReputation = oldInfo.reputation * p.factor
+        knownPeers[peer] = PeerInfo(newReputation, System.currentTimeMillis())
+        Logger.debug(TAG, "Decreased peer reputation for ${peer.host}:${peer.port}: ${oldInfo.reputation} -> $newReputation (${p.javaClass.simpleName})")
     }
 
     private fun updatePeerReputation(peer: Peer, r: Reward) {
         val oldInfo = knownPeers[peer] ?: return
-        knownPeers[peer] = PeerInfo(oldInfo.reputation * r.factor, System.currentTimeMillis())
+        val newReputation = oldInfo.reputation * r.factor
+        knownPeers[peer] = PeerInfo(newReputation, System.currentTimeMillis())
+        Logger.debug(TAG, "Increased peer reputation for ${peer.host}:${peer.port}: ${oldInfo.reputation} -> $newReputation (${r.javaClass.simpleName})")
     }
 
     private suspend fun askPeer(
