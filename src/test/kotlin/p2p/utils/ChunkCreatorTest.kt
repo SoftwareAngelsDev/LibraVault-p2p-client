@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import p2p.domain.Chunk
+import p2p.helpers.ChunkCreator
+import p2p.helpers.ChunkCreator.Companion.DEFAULT_CHUNK_SIZE_BYTES
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
@@ -50,15 +52,15 @@ class ChunkCreatorTest {
 
     @Test
     fun `test create chunks for small file`() = runBlocking<Unit> {
-        // Create a small test file (~2KB)
-        val fileSize = 2 * 1024L
+        // Create a small test file (2KB)
+        val fileSize = convertKBToBytes(2)
         testFileChunkingAndMerging(fileSize, "small")
     }
 
     @Test
     fun `test create chunks for file exactly at chunk size boundary`() = runBlocking<Unit> {
         // Create a file exactly at chunk boundary (100MB)
-        val fileSize = Chunk.CHUNK_SIZE_BYTES.toLong()
+        val fileSize = DEFAULT_CHUNK_SIZE_BYTES.toLong()
         testFileChunkingAndMerging(fileSize, "boundary")
     }
 
@@ -72,7 +74,7 @@ class ChunkCreatorTest {
     @Test
     fun `test create multiple chunks for medium sized file`() = runBlocking<Unit> {
         // Create a medium sized file (210MB)
-        val fileSize = (Chunk.CHUNK_SIZE_BYTES * 2) + (Chunk.CHUNK_SIZE_BYTES / 10)
+        val fileSize = (DEFAULT_CHUNK_SIZE_BYTES * 2) + (DEFAULT_CHUNK_SIZE_BYTES / 10)
         testFileChunkingAndMerging(fileSize.toLong(), "medium")
     }
 
@@ -85,7 +87,7 @@ class ChunkCreatorTest {
 
         // Calculate expected hash
         val expectedHash = calculateFileHash(testFile)
-        val expectedNumberOfChunks = ceil(fileSize.toDouble() / Chunk.CHUNK_SIZE_BYTES).toLong()
+        val expectedNumberOfChunks = ceil(fileSize.toDouble() / DEFAULT_CHUNK_SIZE_BYTES).toLong()
 
         // Split file into chunks to get the fileId
         val result = chunkCreator.splitFileIntoChunks(testFile, relativePath)
@@ -100,14 +102,14 @@ class ChunkCreatorTest {
     @Test
     fun `test chunk calculation for very large file`() = runBlocking<Unit> {
         // Create an actual 10GB test file
-        val fileSize = 10L * 1024 * 1024 * 1024 // 10GB
+        val fileSize = convertGBToBytes(100)
         testFileChunkingAndMerging(fileSize, "very_large")
     }
 
     @Test
     fun `test merge chunks for small file`() = runBlocking<Unit> {
         // Create a small test file
-        val fileSize = 5 * 1024
+        val fileSize = convertKBToBytes(5)
         val originalFile = createTestFile(fileSize.toLong())
         val relativePath = "test/merge_small.txt"
 
@@ -134,15 +136,33 @@ class ChunkCreatorTest {
 
     @Test
     fun `test merge multiple chunks`() = runBlocking<Unit> {
-        // Create a file that will be split into multiple chunks (101MB)
-        val fileSize = Chunk.CHUNK_SIZE_BYTES + 1024 * 1024L
-        testFileChunkingAndMerging(fileSize, "multiple_chunks")
+        // Define explicit chunk size for this test
+        val chunkSizeBytes = convertMBToBytes(100).toInt()
+        
+        // Create a file size that ensures multiple chunks (11 chunks total)
+        // 10 complete chunks plus 1 partial chunk
+        val completeChunks = 10
+        val fileSize = (chunkSizeBytes.toLong() * completeChunks) + (chunkSizeBytes / 2)
+        
+        testFileChunkingAndMerging(fileSize, "multiple_chunks", chunkSizeBytes = chunkSizeBytes)
+    }
+
+    @Test
+    fun `test merge multiple chunks with different chunk sizes`() = runBlocking<Unit> {
+        // Define smaller chunk size for this test
+        val chunkSizeBytes = convertMBToBytes(10).toInt()
+        
+        // Create a file that will generate 110 chunks (109 complete + 1 partial)
+        val completeChunks = 109
+        val fileSize = (chunkSizeBytes.toLong() * completeChunks) + (chunkSizeBytes / 2)
+        
+        testFileChunkingAndMerging(fileSize, "multiple_chunks", chunkSizeBytes = chunkSizeBytes)
     }
 
     @Test
     fun `test merge chunks in wrong order`() = runBlocking<Unit> {
-        // Create a file that will be split into multiple chunks (201MB)
-        val fileSize = Chunk.CHUNK_SIZE_BYTES * 2 + 1024 * 1024L
+        // Create a file that will be split into multiple chunks
+        val fileSize = (DEFAULT_CHUNK_SIZE_BYTES + convertMBToBytes(1)) * 2L
 
         // Define a chunk ordering function that sorts chunks in reverse order
         val reverseOrderingFn: (List<Chunk>) -> List<Chunk> = { chunks ->
@@ -155,7 +175,7 @@ class ChunkCreatorTest {
     @Test
     fun `test merge with missing chunks throws exception`() = runBlocking<Unit> {
         // Create a file that will be split into multiple chunks (201MB)
-        val fileSize = Chunk.CHUNK_SIZE_BYTES * 2 + 1024 * 1024L
+        val fileSize = DEFAULT_CHUNK_SIZE_BYTES * 2 + 1024 * 1024L
 
         // Test with missing chunk parameter set to false and expected error message
         val exception = assertThrows(IllegalArgumentException::class.java) {
@@ -176,7 +196,7 @@ class ChunkCreatorTest {
         val file = tempDir.resolve("test_file_${sizeInBytes}.bin").toFile()
 
         // For small files, write the actual content
-        if (sizeInBytes < 10 * 1024 * 1024) { // Less than 10MB
+        if (sizeInBytes < convertMBToBytes(10)) { // Less than 10MB
             val buffer = ByteArray(1024)
             Random().nextBytes(buffer)
 
@@ -312,10 +332,11 @@ class ChunkCreatorTest {
     private suspend fun testFileChunkingAndMerging(
         fileSize: Long,
         fileDescription: String,
-        chunkOrderingFn: ((List<Chunk>) -> List<Chunk>)? = null
+        chunkOrderingFn: ((List<Chunk>) -> List<Chunk>)? = null,
+        chunkSizeBytes: Int = DEFAULT_CHUNK_SIZE_BYTES
     ) {
         // Check if we have enough disk space
-        val chunkSize = Chunk.CHUNK_SIZE_BYTES.toLong()
+        val chunkSize = chunkSizeBytes.toLong()
         val requiredSpace = fileSize * 2 // Original file + chunks
         val freeSpace = File(tempDir.toString()).freeSpace
 
@@ -335,7 +356,7 @@ class ChunkCreatorTest {
 
         // Split into chunks
         println("Processing $fileDescription file into chunks...")
-        val result = chunkCreator.splitFileIntoChunks(testFile, relativePath)
+        val result = chunkCreator.splitFileIntoChunks(testFile, relativePath, chunkSizeBytes)
 
         // Verify number of chunks
         assertEquals(

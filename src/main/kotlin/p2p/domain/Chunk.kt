@@ -5,10 +5,6 @@ abstract class Chunk(
     val metadata: ChunkMetadata,
     val path: String
 ) {
-    companion object {
-        const val CHUNK_SIZE_BYTES = 100 * 1024 * 1024 // 100MB
-    }
-
     abstract fun getTransmittingData(): ByteArray
 
     abstract fun getChunkData(): ByteArray

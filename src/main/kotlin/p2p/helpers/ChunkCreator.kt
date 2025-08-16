@@ -1,22 +1,25 @@
-package p2p.utils
+package p2p.helpers
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import p2p.domain.Chunk
-import p2p.domain.Chunk.Companion.CHUNK_SIZE_BYTES
 import p2p.domain.ChunkMetadata
-import p2p.domain.ChunkMetadata.Companion.MAX_METADATA_SIZE_BYTES
 import p2p.domain.FileId
 import p2p.domain.FileId.Companion.FILE_ID_SIZE_BYTES
 import p2p.domain.FileId.Companion.HASH_SIZE_BYTES
 import p2p.domain.FileId.Companion.NUMBER_OF_CHUNKS_SIZE_BYTES
 import p2p.domain.FileId.Companion.USER_PUBLIC_KEY_SIZE_BYTES
+import p2p.utils.convertMBToBytes
+import p2p.utils.toByteArray
+import p2p.utils.toInt
+import p2p.utils.toLong
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.ceil
 import kotlin.math.max
+import kotlin.math.min
 
 class ChunkCreator(
     private val userPublicKey: ByteArray, // 256 bits
@@ -24,6 +27,10 @@ class ChunkCreator(
     private val encrypt: (ByteArray) -> ByteArray,
     private val decrypt: (ByteArray) -> ByteArray,
 ) {
+    companion object {
+        val DEFAULT_CHUNK_SIZE_BYTES = convertMBToBytes(100).toInt()
+    }
+
     class ChunkCreationResult(
         val chunks: List<Chunk>,
         val progressPercentage: Short
@@ -42,7 +49,7 @@ class ChunkCreator(
 
         override fun getChunkData(): ByteArray {
             val finalChunkData = getTransmittingData()
-            val headerSize = FILE_ID_SIZE_BYTES + metadata.toByteArray(encrypt).size
+            val headerSize = FileId.Companion.FILE_ID_SIZE_BYTES + metadata.toByteArray(encrypt).size
 
             if (finalChunkData.size < headerSize) {
                 throw IllegalArgumentException("Chunk is of invalid size: ${finalChunkData.size} bytes")
@@ -107,9 +114,13 @@ class ChunkCreator(
         }
     }
 
-    suspend fun splitFileIntoChunks(file: File, relativePath: String): ChunkCreationResult =
+    suspend fun splitFileIntoChunks(
+        file: File,
+        relativePath: String,
+        chunkSizeBytes: Int = DEFAULT_CHUNK_SIZE_BYTES
+    ): ChunkCreationResult =
         withContext(Dispatchers.IO) {
-            val numberOfChunks = ceil(file.length().toDouble() / CHUNK_SIZE_BYTES).toLong()
+            val numberOfChunks = ceil(file.length().toDouble() / chunkSizeBytes).toLong()
             val fileId = calculateFileId(file, numberOfChunks)
 
             val chunks = mutableListOf<Chunk>()
@@ -117,8 +128,8 @@ class ChunkCreator(
 
             file.inputStream().buffered().use { input ->
                 for (chunkIndex in 0 until numberOfChunks) {
-                    val chunkStartIndex = chunkIndex * CHUNK_SIZE_BYTES
-                    val chunkEndIndex = minOf(file.length(), (chunkIndex + 1) * CHUNK_SIZE_BYTES)
+                    val chunkStartIndex = chunkIndex * chunkSizeBytes
+                    val chunkEndIndex = minOf(file.length(), (chunkIndex + 1) * chunkSizeBytes)
                     val chunkSize = (chunkEndIndex - chunkStartIndex).toInt()
 
                     val metadata = ChunkMetadata(
@@ -128,7 +139,7 @@ class ChunkCreator(
                         index = chunkIndex,
                     )
 
-                    assert(chunkSize <= CHUNK_SIZE_BYTES) { "Chunk size must be less than $CHUNK_SIZE_BYTES bytes" }
+                    assert(chunkSize <= chunkSizeBytes) { "Chunk size must be less than $chunkSizeBytes bytes" }
 
                     val chunkFileData = ByteArray(chunkSize)
 
@@ -168,21 +179,21 @@ class ChunkCreator(
         val metadataBytes = metadata.toByteArray(encrypt)
 
         // Prepend fileId and metadata to data
-        val finalChunkData = ByteArray(FILE_ID_SIZE_BYTES + metadataBytes.size + data.size)
-        System.arraycopy(fileIdBytes, 0, finalChunkData, 0, FILE_ID_SIZE_BYTES)
-        System.arraycopy(metadataBytes, 0, finalChunkData, FILE_ID_SIZE_BYTES, metadataBytes.size)
-        System.arraycopy(data, 0, finalChunkData, FILE_ID_SIZE_BYTES + metadataBytes.size, data.size)
+        val finalChunkData = ByteArray(FileId.Companion.FILE_ID_SIZE_BYTES + metadataBytes.size + data.size)
+        System.arraycopy(fileIdBytes, 0, finalChunkData, 0, FileId.Companion.FILE_ID_SIZE_BYTES)
+        System.arraycopy(metadataBytes, 0, finalChunkData, FileId.Companion.FILE_ID_SIZE_BYTES, metadataBytes.size)
+        System.arraycopy(data, 0, finalChunkData, FileId.Companion.FILE_ID_SIZE_BYTES + metadataBytes.size, data.size)
 
         return finalChunkData
     }
 
     private fun decodeChunk(chunkFile: File): Chunk {
         // Calculate max possible header size
-        val maxHeaderSize = FILE_ID_SIZE_BYTES + MAX_METADATA_SIZE_BYTES
+        val maxHeaderSize = FileId.Companion.FILE_ID_SIZE_BYTES + ChunkMetadata.Companion.MAX_METADATA_SIZE_BYTES
 
         // Read only the bytes needed for the header
         val fileLength = chunkFile.length()
-        val bytesToRead = kotlin.math.min(maxHeaderSize.toLong(), fileLength)
+        val bytesToRead = min(maxHeaderSize.toLong(), fileLength)
         val finalChunkData = chunkFile.inputStream().use { it.readNBytes(bytesToRead.toInt()) }
 
         val fileId = fileIdFromByteArray(finalChunkData)
@@ -219,7 +230,6 @@ class ChunkCreator(
         }
     }
 }
-
 
 private fun ChunkMetadata.toByteArray(encrypt: (ByteArray) -> ByteArray): ByteArray {
     val encryptedPath = encrypt(userRelativePath.toByteArray())
