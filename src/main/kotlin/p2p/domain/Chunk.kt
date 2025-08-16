@@ -1,19 +1,33 @@
 package p2p.domain
 
+import java.util.Base64
+
+
+typealias UserPublicKey = ByteArray
+typealias ChunkRawData = ByteArray
+typealias ChunkUserData = ByteArray
+typealias FileTotalChunkCount = Long
+typealias ChunkHash = ByteArray
+typealias ChunkIndex = Long
+typealias ChunkUpdatedUnixTimestamp = Long
+typealias ChunkDataLengthBytes = Int
+typealias ChunkFilePath = String
+typealias UserRelativeFilePath = String
+
 abstract class Chunk(
     val fileId: FileId,
     val metadata: ChunkMetadata,
-    val path: String
+    val path: ChunkFilePath
 ) {
-    abstract fun getTransmittingData(): ByteArray
+    abstract fun getRawData(): ChunkRawData
 
-    abstract fun getChunkData(): ByteArray
+    abstract fun getChunkData(): ChunkUserData
 }
 
 class FileId(
-    val userPublicKey: ByteArray,
-    val hash: ByteArray,
-    val numberOfChunks: Long,
+    val userPublicKey: UserPublicKey,
+    val hash: ChunkHash,
+    val numberOfChunks: FileTotalChunkCount,
 ) {
     companion object {
         const val USER_PUBLIC_KEY_SIZE_BYTES = 32 * Byte.SIZE_BYTES
@@ -47,13 +61,26 @@ class FileId(
         result = 31 * result + hash.contentHashCode()
         return result
     }
+
+    override fun toString(): String {
+        return listOf(
+            safeBase64Encode(userPublicKey),
+            safeBase64Encode(hash),
+            numberOfChunks
+        ).joinToString("-")
+    }
+
+    private fun safeBase64Encode(data: ByteArray): String {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(data)
+            .replace("-", "-".hashCode().let { "__${it}__" })
+    }
 }
 
 class ChunkMetadata(
-    val userRelativePath: String,
-    val dataLength: Int,
-    val updatedAt: Long,
-    val index: Long,
+    val userRelativePath: UserRelativeFilePath,
+    val dataLength: ChunkDataLengthBytes,
+    val updatedAt: ChunkUpdatedUnixTimestamp,
+    val index: ChunkIndex,
 ) {
     companion object {
         const val MAX_PATH_SIZE_CHARS = 500
