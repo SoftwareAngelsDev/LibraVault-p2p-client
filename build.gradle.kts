@@ -6,6 +6,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+kotlin {
+    jvmToolchain(21) // Setting JVM target compatibility - Latest LTS version
+    
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
+}
+
 sourceSets {
     test {
         kotlin.srcDirs("src/test/kotlin")
@@ -39,6 +47,10 @@ dependencies {
     
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    
+    // Koin for Dependency Injection
+    implementation("io.insert-koin:koin-core:4.1.0")
+    testImplementation("io.insert-koin:koin-test:4.1.0")
 
     // Test dependencies
     testImplementation(kotlin("test-junit5"))

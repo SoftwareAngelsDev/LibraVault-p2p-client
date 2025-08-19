@@ -1,10 +1,13 @@
 package p2p.domain
 
-typealias RemotePeerPublicKey = ByteArray
+typealias RemotePeerPublicKey = UserPublicKey
+typealias RemotePeerId = RemotePeerPublicKey
 
 class RemotePeer(
     val publicKey: RemotePeerPublicKey,
 ) {
+    val id = publicKey
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

@@ -2,14 +2,14 @@ package p2p.helpers
 
 import p2p.domain.ChunkIndex
 import p2p.domain.FileId
-import p2p.domain.UserRelativeFilePath
+import p2p.domain.FileUserRelativeFilePath
 import p2p.network.NetworkClient
 
 class ChunkDistributor(
     private val client: NetworkClient,
     private val chunkCreator: ChunkCreator,
 ) {
-    fun propagateUserRelativePathUpdate(fileId: FileId, newPath: UserRelativeFilePath) {
+    fun propagateUserRelativePathUpdate(fileId: FileId, newPath: FileUserRelativeFilePath) {
         TODO()
     }
 

@@ -8,6 +8,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import org.koin.core.context.startKoin
+import org.koin.java.KoinJavaComponent.inject
+import p2p.di.appModule
 import p2p.utils.Logger
 import p2p.utils.LogLevel
 
@@ -16,7 +19,6 @@ import p2p.utils.LogLevel
 fun LoginScreen() {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isLoginSuccessful by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     MaterialTheme {
@@ -79,15 +81,16 @@ fun LoginScreen() {
 
 // Placeholder functions for login logic
 fun login(username: String, password: String): Boolean {
-    Logger.info("Auth", "Login attempt for user: $username")
+    val logger: Logger by inject(Logger::class.java)
+    logger.info("Auth", "Login attempt for user: $username")
     
     // TODO: Implement actual login logic
     val success = false
     
     if (success) {
-        Logger.info("Auth", "Login successful for user: $username")
+        logger.info("Auth", "Login successful for user: $username")
     } else {
-        Logger.warn("Auth", "Login failed for user: $username")
+        logger.warn("Auth", "Login failed for user: $username")
     }
     
     return success
@@ -95,24 +98,31 @@ fun login(username: String, password: String): Boolean {
 
 fun main() {
     try {
+        // Start Koin
+        startKoin {
+            modules(appModule)
+        }
+
+        val logger: Logger by inject(Logger::class.java)
+        
         // Configure logger
-        Logger.setLogLevel(LogLevel.DEBUG)
+        logger.setLogLevel(LogLevel.DEBUG)
         
         // Setup file logging with 10MB per file and 10 files max (100MB total)
-        Logger.configureFileLogging(
+        logger.configureFileLogging(
             enabled = true,
             directory = "logs",
             maxFileSizeMB = 10,
             maxFiles = 10
         )
         
-        Logger.info("App", "Starting LibraVault P2P Client")
+        logger.info("App", "Starting LibraVault P2P Client")
         
         application {
             Window(
                 onCloseRequest = {
-                    Logger.info("App", "Shutting down LibraVault P2P Client")
-                    Logger.shutdown() // Clean up file handles
+                    logger.info("App", "Shutting down LibraVault P2P Client")
+                    logger.shutdown() // Clean up file handles
                     exitApplication()
                 },
                 title = "LibraVault Login"
@@ -121,7 +131,9 @@ fun main() {
             }
         }
     } catch (e: Exception) {
-        Logger.error("App", "Fatal error during application startup", e)
+        // Since we can't use the logger during startup error, use System.err
+        System.err.println("Fatal error during application startup: ${e.message}")
+        e.printStackTrace()
         throw e
     }
 }

@@ -26,7 +26,7 @@ class ChunkCreator(
     private val decrypt: (ByteArray) -> ByteArray,
 ) {
     companion object {
-        val DEFAULT_CHUNK_SIZE_BYTES = convertMBToBytes(100).toInt()
+        val DEFAULT_MAX_CHUNK_SIZE_BYTES = convertMBToBytes(100).toInt()
     }
 
     class ChunkCreationResult(
@@ -37,7 +37,7 @@ class ChunkCreator(
     private class NetworkChunk(
         fileId: FileId,
         metadata: ChunkMetadata,
-        path: ChunkFilePath,
+        path: ChunkStoragePath,
         private val encrypt: (ByteArray) -> ByteArray,
         private val decrypt: (ByteArray) -> ByteArray,
     ) : Chunk(fileId, metadata, path) {
@@ -122,10 +122,10 @@ class ChunkCreator(
     suspend fun splitFileIntoChunks(
         file: File,
         relativePath: String,
-        chunkSizeBytes: Int = DEFAULT_CHUNK_SIZE_BYTES
+        maxChunkSizeBytes: Int = DEFAULT_MAX_CHUNK_SIZE_BYTES
     ): ChunkCreationResult =
         withContext(Dispatchers.IO) {
-            val numberOfChunks = ceil(file.length().toDouble() / chunkSizeBytes).toLong()
+            val numberOfChunks = ceil(file.length().toDouble() / maxChunkSizeBytes).toLong()
             val fileId = calculateFileId(file, numberOfChunks)
 
             val chunks = mutableListOf<Chunk>()
@@ -133,8 +133,8 @@ class ChunkCreator(
 
             file.inputStream().buffered().use { input ->
                 for (chunkIndex in 0 until numberOfChunks) {
-                    val chunkStartIndex = chunkIndex * chunkSizeBytes
-                    val chunkEndIndex = minOf(file.length(), (chunkIndex + 1) * chunkSizeBytes)
+                    val chunkStartIndex = chunkIndex * maxChunkSizeBytes
+                    val chunkEndIndex = minOf(file.length(), (chunkIndex + 1) * maxChunkSizeBytes)
                     val chunkSize = (chunkEndIndex - chunkStartIndex).toInt()
 
                     val metadata = ChunkMetadata(
@@ -144,7 +144,7 @@ class ChunkCreator(
                         index = chunkIndex,
                     )
 
-                    assert(chunkSize <= chunkSizeBytes) { "Chunk size must be less than $chunkSizeBytes bytes" }
+                    assert(chunkSize <= maxChunkSizeBytes) { "Chunk size must be less than $maxChunkSizeBytes bytes" }
 
                     val chunkFileData = ByteArray(chunkSize)
 

@@ -18,7 +18,11 @@ enum class LogLevel(val value: Int) {
     ERROR(3)
 }
 
-object Logger {
+/**
+ * Application logger with file and console output capabilities.
+ * Configured as a singleton via Koin dependency injection.
+ */
+class Logger {
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     private val loggerLock = ReentrantLock()
     

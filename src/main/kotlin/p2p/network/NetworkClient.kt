@@ -5,7 +5,9 @@ package p2p.network
 import kotlinx.coroutines.*
 import p2p.domain.Chunk
 import p2p.domain.RemotePeer
-import p2p.domain.RemotePeerMetadata
+import p2p.domain.RemotePeerId
+import p2p.domain.RemotePeerReputation
+import p2p.helpers.RemotePeerReputationManager
 import p2p.network.messages.DoYouHaveThisChunkRequest
 import p2p.network.messages.DoYouHaveThisChunkResponse
 import p2p.network.messages.NetworkResponse
@@ -23,26 +25,27 @@ typealias PeerPort = AtomicInt
 
 private data class PeerNetworkInfo(
     val peer: RemotePeer,
-    val metadata: AtomicReference<RemotePeerMetadata>,
+    val metadata: AtomicReference<RemotePeerReputation>,
     val host: PeerIpAddress,
     val port: PeerPort,
 )
 
-class NetworkClient {
+class NetworkClient(
+    private val logger: Logger,
+    private val reputationManager: RemotePeerReputationManager,
+) {
     companion object {
         const val MAX_NUMBER_OF_CHUNK_BYTE_CHALLENGES = 5
         const val MINIMUM_REPUTATION_TO_BE_PEER = 0.1
         private const val TAG = "NetworkClient"
     }
 
-    private val knownPeers = ConcurrentHashMap<RemotePeer, PeerNetworkInfo>()
-
     suspend fun whoHas(chunk: Chunk, timeoutSeconds: Int): Collection<RemotePeer> = withContext(Dispatchers.IO) {
-        Logger.info(TAG, "Looking for peers who have chunk ${chunk.metadata.index} of file ${chunk.fileId}")
+        logger.info(TAG, "Looking for peers who have chunk ${chunk.metadata.index} of file ${chunk.fileId}")
         val chunkFile = File(chunk.path)
         val doWeHaveTheFile = chunkFile.exists()
         if (!doWeHaveTheFile) {
-            Logger.debug(TAG, "Local chunk file not found at ${chunk.path}")
+            logger.debug(TAG, "Local chunk file not found at ${chunk.path}")
         }
 
         val challengePositions = if (doWeHaveTheFile) {
@@ -58,6 +61,7 @@ class NetworkClient {
             emptyList()
         }
 
+        // Proof of Retrievability - PoR
         val challengeRespectiveBytes = chunkFile.inputStream().use { stream ->
             // Now we have to read the bytes at the challenge positions
             var cursor = 0
@@ -98,20 +102,20 @@ class NetworkClient {
                             return@async
                         } catch (e: Throwable) {
                             // Track errors with the specific peer
-                            Logger.error(TAG, "Error communicating with peer ${peerInfo.host}:${peerInfo.port}", e)
-                            incrementPeerFailedConnections(peer)
+                            logger.error(TAG, "Error communicating with peer ${peerInfo.host}:${peerInfo.port}", e)
+                            reputationManager.registerFailedConnection(peer.id)
                             errors[peerInfo] = e
                             return@async
                         }
 
-                        incrementPeerSuccessfulConnections(peer)
+                        reputationManager.registerSuccessfulConnection(peer.id)
 
                         if (response != null && response.haveChunk) {
                             if (response.challengeRespectiveBytes == challengeRespectiveBytes) {
                                 ackPeers[peer] = Unit
-                                updatePeerReputation(peer, Reward.CORRECT_CHALLENGE_RESPONSE)
+                                reputationManager.updatePeerReputation(peer.id, Reward.CORRECT_CHALLENGE_RESPONSE)
                             } else {
-                                updatePeerReputation(peer, Punishment.WRONG_CHALLENGE_RESPONSE)
+                                reputationManager.updatePeerReputation(peer.id, Punishment.WRONG_CHALLENGE_RESPONSE)
                             }
                         }
                     }
@@ -136,63 +140,10 @@ class NetworkClient {
         return@withContext ackPeers.keys
     }
 
-    private fun getEligiblePeers(): Map<RemotePeer, PeerNetworkInfo> {
-        val eligiblePeers = knownPeers
-            .filter { (_, peerInfo) -> peerInfo.metadata.get().reputation >= MINIMUM_REPUTATION_TO_BE_PEER }
-        return eligiblePeers
-    }
-
-    private fun incrementPeerSuccessfulConnections(peer: RemotePeer) {
-        val peerInfo = knownPeers[peer] ?: return
-        val oldInfo = peerInfo.metadata.get()
-
-        peerInfo.metadata.set(
-            oldInfo.copy(
-                successfulConnections = oldInfo.successfulConnections + 1,
-                lastSeen = System.currentTimeMillis()
-            )
-        )
-    }
-
-    private fun incrementPeerFailedConnections(peer: RemotePeer) {
-        val peerInfo = knownPeers[peer] ?: return
-        val oldInfo = peerInfo.metadata.get()
-
-        peerInfo.metadata.set(
-            oldInfo.copy(
-                failedConnections = oldInfo.failedConnections + 1,
-            )
-        )
-    }
-
-    private fun updatePeerReputation(peer: RemotePeer, p: Punishment) {
-        val peerInfo = knownPeers[peer] ?: return
-        val oldInfo = peerInfo.metadata.get()
-
-        val newReputation = oldInfo.reputation * p.factor
-        peerInfo.metadata.set(
-            oldInfo.copy(reputation = newReputation, lastSeen = System.currentTimeMillis())
-        )
-
-        Logger.debug(
-            TAG,
-            "Decreased peer reputation for ${peerInfo.host}:${peerInfo.port}: ${oldInfo.reputation} -> $newReputation (${p.javaClass.simpleName})"
-        )
-    }
-
-    private fun updatePeerReputation(peer: RemotePeer, r: Reward) {
-        val peerInfo = knownPeers[peer] ?: return
-        val oldInfo = peerInfo.metadata.get()
-
-        val newReputation = oldInfo.reputation * r.factor
-        peerInfo.metadata.set(
-            oldInfo.copy(reputation = newReputation, lastSeen = System.currentTimeMillis())
-        )
-
-        Logger.debug(
-            TAG,
-            "Increased peer reputation for ${peerInfo.host}:${peerInfo.port}: ${oldInfo.reputation} -> $newReputation (${r.javaClass.simpleName})"
-        )
+    private fun getEligiblePeers(): Map<RemotePeerId, RemotePeerReputation> {
+        return reputationManager
+            .getKnownRemotePeers()
+            .filter { (_, peerRep) -> peerRep.score >= MINIMUM_REPUTATION_TO_BE_PEER }
     }
 
     private suspend fun askPeer(
@@ -202,5 +153,4 @@ class NetworkClient {
     ): NetworkResponse? = withContext(Dispatchers.IO) {
         TODO()
     }
-
 }

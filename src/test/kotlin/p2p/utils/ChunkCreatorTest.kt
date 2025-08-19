@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import p2p.domain.Chunk
 import p2p.helpers.ChunkCreator
-import p2p.helpers.ChunkCreator.Companion.DEFAULT_CHUNK_SIZE_BYTES
+import p2p.helpers.ChunkCreator.Companion.DEFAULT_MAX_CHUNK_SIZE_BYTES
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
@@ -60,7 +60,7 @@ class ChunkCreatorTest {
     @Test
     fun `test create chunks for file exactly at chunk size boundary`() = runBlocking<Unit> {
         // Create a file exactly at chunk boundary (100MB)
-        val fileSize = DEFAULT_CHUNK_SIZE_BYTES.toLong()
+        val fileSize = DEFAULT_MAX_CHUNK_SIZE_BYTES.toLong()
         testFileChunkingAndMerging(fileSize, "boundary")
     }
 
@@ -74,7 +74,7 @@ class ChunkCreatorTest {
     @Test
     fun `test create multiple chunks for medium sized file`() = runBlocking<Unit> {
         // Create a medium sized file (210MB)
-        val fileSize = (DEFAULT_CHUNK_SIZE_BYTES * 2) + (DEFAULT_CHUNK_SIZE_BYTES / 10)
+        val fileSize = (DEFAULT_MAX_CHUNK_SIZE_BYTES * 2) + (DEFAULT_MAX_CHUNK_SIZE_BYTES / 10)
         testFileChunkingAndMerging(fileSize.toLong(), "medium")
     }
 
@@ -87,7 +87,7 @@ class ChunkCreatorTest {
 
         // Calculate expected hash
         val expectedHash = calculateFileHash(testFile)
-        val expectedNumberOfChunks = ceil(fileSize.toDouble() / DEFAULT_CHUNK_SIZE_BYTES).toLong()
+        val expectedNumberOfChunks = ceil(fileSize.toDouble() / DEFAULT_MAX_CHUNK_SIZE_BYTES).toLong()
 
         // Split file into chunks to get the fileId
         val result = chunkCreator.splitFileIntoChunks(testFile, relativePath)
@@ -162,7 +162,7 @@ class ChunkCreatorTest {
     @Test
     fun `test merge chunks in wrong order`() = runBlocking<Unit> {
         // Create a file that will be split into multiple chunks
-        val fileSize = (DEFAULT_CHUNK_SIZE_BYTES + convertMBToBytes(1)) * 2L
+        val fileSize = (DEFAULT_MAX_CHUNK_SIZE_BYTES + convertMBToBytes(1)) * 2L
 
         // Define a chunk ordering function that sorts chunks in reverse order
         val reverseOrderingFn: (List<Chunk>) -> List<Chunk> = { chunks ->
@@ -175,7 +175,7 @@ class ChunkCreatorTest {
     @Test
     fun `test merge with missing chunks throws exception`() = runBlocking<Unit> {
         // Create a file that will be split into multiple chunks (201MB)
-        val fileSize = DEFAULT_CHUNK_SIZE_BYTES * 2 + 1024 * 1024L
+        val fileSize = DEFAULT_MAX_CHUNK_SIZE_BYTES * 2 + 1024 * 1024L
 
         // Test with missing chunk parameter set to false and expected error message
         val exception = assertThrows(IllegalArgumentException::class.java) {
@@ -333,7 +333,7 @@ class ChunkCreatorTest {
         fileSize: Long,
         fileDescription: String,
         chunkOrderingFn: ((List<Chunk>) -> List<Chunk>)? = null,
-        chunkSizeBytes: Int = DEFAULT_CHUNK_SIZE_BYTES
+        chunkSizeBytes: Int = DEFAULT_MAX_CHUNK_SIZE_BYTES
     ) {
         // Check if we have enough disk space
         val chunkSize = chunkSizeBytes.toLong()

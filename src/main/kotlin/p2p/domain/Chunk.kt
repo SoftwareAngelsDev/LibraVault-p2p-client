@@ -1,7 +1,6 @@
 package p2p.domain
 
-import java.util.Base64
-
+import java.util.*
 
 typealias UserPublicKey = ByteArray
 typealias ChunkRawData = ByteArray
@@ -11,13 +10,13 @@ typealias ChunkHash = ByteArray
 typealias ChunkIndex = Long
 typealias ChunkUpdatedUnixTimestamp = Long
 typealias ChunkDataLengthBytes = Int
-typealias ChunkFilePath = String
-typealias UserRelativeFilePath = String
+typealias ChunkStoragePath = String
+typealias FileUserRelativeFilePath = String
 
 abstract class Chunk(
     val fileId: FileId,
     val metadata: ChunkMetadata,
-    val path: ChunkFilePath
+    val path: ChunkStoragePath
 ) {
     abstract fun getRawData(): ChunkRawData
 
@@ -77,7 +76,7 @@ class FileId(
 }
 
 class ChunkMetadata(
-    val userRelativePath: UserRelativeFilePath,
+    val userRelativePath: FileUserRelativeFilePath,
     val dataLength: ChunkDataLengthBytes,
     val updatedAt: ChunkUpdatedUnixTimestamp,
     val index: ChunkIndex,
