@@ -21,7 +21,8 @@ class RemotePeerReputationManager(val logger: Logger) {
 
     fun getPeerReputation(peerId: RemotePeerId): RemotePeerReputation? {
         synchronized(lock) {
-            return /* find on our DB */ ?: addNewRemotePeer(peerId)
+            TODO()
+            //return /* find on our DB */ ?: addNewRemotePeer(peerId)
         }
     }
 

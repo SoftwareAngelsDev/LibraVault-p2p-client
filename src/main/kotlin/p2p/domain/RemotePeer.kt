@@ -1,5 +1,7 @@
 package p2p.domain
 
+typealias UserPublicKey = ByteArray // 4096 bits
+typealias UserSignature = ByteArray // 4096 bits
 typealias RemotePeerPublicKey = UserPublicKey
 typealias RemotePeerId = RemotePeerPublicKey
 
