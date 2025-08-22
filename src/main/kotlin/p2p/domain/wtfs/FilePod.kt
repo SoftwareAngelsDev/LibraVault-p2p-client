@@ -4,6 +4,7 @@ import p2p.utils.convertMBToBytes
 
 typealias PodNumber = Int
 typealias UnixTimestamp = Long
+typealias FilePodEncoded = ByteArray
 
 class FilePod(
     val number: PodNumber,
@@ -12,6 +13,6 @@ class FilePod(
     val updatedAt: UnixTimestamp
 ) {
     companion object {
-        val POD_FIXED_SIZE_BYTES = convertMBToBytes(100).toInt()
+        val POD_FIXED_SIZE_BYTES = convertMBToBytes(100).toInt() // 100 MB
     }
 }

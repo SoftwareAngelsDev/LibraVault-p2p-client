@@ -1,12 +1,9 @@
 package p2p.helpers
 
-import p2p.domain.wtfs.FileContent
+import p2p.domain.wtfs.*
 import p2p.domain.wtfs.FileContentHash
 import p2p.domain.wtfs.FileContentLengthBytes
-import p2p.domain.wtfs.FileId
-import p2p.domain.wtfs.FilePod
 import p2p.domain.wtfs.FileReservedMetadata
-import p2p.domain.wtfs.INode
 import p2p.domain.wtfs.PodNumber
 import p2p.domain.wtfs.UnixTimestamp
 import p2p.utils.mergeByteArrays
@@ -56,7 +53,7 @@ class FilePodEncoder(
         val RESERVED_BITS_MASK = 0x7F.toByte()
     }
 
-    fun encode(filePod: FilePod, contents: Map<FileId, FileContent>): ByteArray {
+    fun encode(filePod: FilePod, contents: Map<FileId, FileContent>): FilePodEncoded {
         val encodedFiles = encodeFiles(filePod, contents)
         val padding = encodePadding(encodedFiles)
         val encodedHeader = encodeHeader(filePod, encodedFiles, padding)

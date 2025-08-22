@@ -34,7 +34,7 @@ class FilePodEncoderDecoderTest {
     @BeforeEach
     fun setUp() {
         // Create configuration manager with a dummy repository path
-        configurationManager = ConfigurationManager("/tmp/dummy-repo-path")
+        configurationManager = ConfigurationManager()
 
         // Create our encoder/decoder with mock encryption functions
         encoder = FilePodEncoder(
