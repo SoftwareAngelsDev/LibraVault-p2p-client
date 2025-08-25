@@ -51,6 +51,14 @@ dependencies {
     // Koin for Dependency Injection
     implementation("io.insert-koin:koin-core:4.1.0")
     testImplementation("io.insert-koin:koin-test:4.1.0")
+    
+    // SQLite
+    implementation("org.xerial:sqlite-jdbc:3.43.0.0")
+    implementation("app.cash.sqldelight:sqlite-driver:2.0.1")
+    implementation("org.jetbrains.exposed:exposed-core:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:0.47.0")
 
     // Test dependencies
     testImplementation(kotlin("test-junit5"))
@@ -58,6 +66,9 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.3")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    
+    // H2 in-memory database for testing
+    testImplementation("com.h2database:h2:2.2.224")
 }
 
 compose.desktop {

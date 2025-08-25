@@ -11,7 +11,6 @@ import p2p.helpers.FilePodEncoder.Companion.OWNER_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.RESERVED_BITS_MASK
 import p2p.helpers.FilePodEncoder.Companion.SIGNATURE_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.TIMESTAMP_SIZE_BYTES
-import p2p.utils.mergeByteArrays
 import p2p.utils.toInt
 import p2p.utils.toLong
 import java.util.*
@@ -87,7 +86,8 @@ class FilePodDecoder(
         val dataToVerify = createSigningData(
             numberBytes,
             updatedAtBytes,
-            encodedFiles
+            encodedFiles,
+            EMPTY_BYTE_ARRAY
         )
 
         if (!verify(dataToVerify, signature)) {
@@ -104,12 +104,6 @@ class FilePodDecoder(
             updatedAt = updatedAt
         ) to content
     }
-
-    private fun createSigningData(
-        encodedNumber: ByteArray,
-        encodedUpdatedAt: ByteArray,
-        encodedFiles: ByteArray
-    ): ByteArray = mergeByteArrays(encodedNumber, encodedUpdatedAt, encodedFiles)
 
     private fun decodeFiles(encodedFiles: ByteArray): Pair<Collection<INode>, Map<FileId, FileContent>> {
         val iNodes = LinkedList<INode>()

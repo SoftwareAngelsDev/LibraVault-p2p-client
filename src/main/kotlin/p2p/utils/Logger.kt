@@ -22,7 +22,7 @@ enum class LogLevel(val value: Int) {
  * Application logger with file and console output capabilities.
  * Configured as a singleton via Koin dependency injection.
  */
-class Logger {
+class Logger : LoggerInterface {
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     private val loggerLock = ReentrantLock()
     
@@ -80,25 +80,25 @@ class Logger {
         }
     }
     
-    fun debug(tag: String, message: String) {
+    override fun debug(tag: String, message: String) {
         if (currentLogLevel.value <= LogLevel.DEBUG.value) {
             log(tag, message, LogLevel.DEBUG)
         }
     }
     
-    fun info(tag: String, message: String) {
+    override fun info(tag: String, message: String) {
         if (currentLogLevel.value <= LogLevel.INFO.value) {
             log(tag, message, LogLevel.INFO)
         }
     }
     
-    fun warn(tag: String, message: String) {
+    override fun warn(tag: String, message: String) {
         if (currentLogLevel.value <= LogLevel.WARN.value) {
             log(tag, message, LogLevel.WARN)
         }
     }
     
-    fun error(tag: String, message: String, throwable: Throwable? = null) {
+    override fun error(tag: String, message: String, throwable: Throwable?) {
         if (currentLogLevel.value <= LogLevel.ERROR.value) {
             log(tag, message, LogLevel.ERROR)
             

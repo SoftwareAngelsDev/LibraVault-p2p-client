@@ -1,8 +1,8 @@
 package p2p.domain
 
+import p2p.domain.wtfs.UnixTimestamp
+
 typealias RemotePeerReputationScore = Double
-typealias RemotePeerFirstSeenUnixTimestamp = Long
-typealias RemotePeerLastSeenUnixTimestamp = Long
 typealias RemotePeerSuccessfulConnections = Int
 typealias RemotePeerFailedConnections = Int
 typealias RemotePeerValidDownloadsCompleted = Int
@@ -13,8 +13,8 @@ data class RemotePeerReputation(
     val score: RemotePeerReputationScore,
     val successfulConnections: RemotePeerSuccessfulConnections = 0,
     val failedConnections: RemotePeerFailedConnections = 0,
-    val firstSeen: RemotePeerFirstSeenUnixTimestamp = System.currentTimeMillis(),
-    val lastSeen: RemotePeerLastSeenUnixTimestamp = System.currentTimeMillis(),
+    val firstSeen: UnixTimestamp = System.currentTimeMillis(),
+    val lastSeen: UnixTimestamp = System.currentTimeMillis(),
     val validDownloadsCompleted: RemotePeerValidDownloadsCompleted = 0,
     val isBlocked: RemotePeerBlockedStatus = false
 )

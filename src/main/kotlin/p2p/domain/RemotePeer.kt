@@ -16,9 +16,7 @@ class RemotePeer(
 
         other as RemotePeer
 
-        if (!publicKey.contentEquals(other.publicKey)) return false
-
-        return true
+        return publicKey.contentEquals(other.publicKey)
     }
 
     override fun hashCode(): Int {

@@ -7,8 +7,8 @@ typealias UnixTimestamp = Long
 typealias FilePodEncoded = ByteArray
 
 class FilePod(
-    val number: PodNumber,
     val owner: p2p.domain.RemotePeerId,
+    val number: PodNumber,
     val iNodes: Collection<INode>,
     val updatedAt: UnixTimestamp
 ) {
