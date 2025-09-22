@@ -8,15 +8,8 @@ import p2p.helpers.ConfigurationManager
 import p2p.utils.Logger
 import java.net.*
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
-
-// Type aliases for compatibility with NetworkClient.kt
-// Used externally but not in our simplified implementation
-typealias PeerIpAddress = AtomicReference<String>
-typealias PeerPort = AtomicInt
 
 open class STUNClient {
     companion object {

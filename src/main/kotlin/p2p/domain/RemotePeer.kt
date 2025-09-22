@@ -1,12 +1,14 @@
 package p2p.domain
 
-typealias UserPublicKey = ByteArray // 4096 bits
-typealias UserSignature = ByteArray // 4096 bits
-typealias RemotePeerPublicKey = UserPublicKey
-typealias RemotePeerId = RemotePeerPublicKey
+typealias PeerPublicKey = ByteArray // 4096 bits = 512 bytes
+typealias PeerSignature = ByteArray // 4096 bits = 512 bytes
+typealias RemotePeerId = PeerPublicKey
+
+const val KEY_SIZE_BYTES = 512
+const val SIGNATURE_SIZE_BYTES = 512
 
 class RemotePeer(
-    val publicKey: RemotePeerPublicKey,
+    val publicKey: PeerPublicKey,
 ) {
     val id = publicKey
 
