@@ -6,6 +6,8 @@ class ConfigurationManager {
     val repositoryAbsolutePath: String = System.getProperty("user.dir")
     val privateKey: ByteArray = Base64.getDecoder().decode(System.getProperty("user.key"))
     val publicKey = privateKey // TODO: Generate public key from private key
+    val udpPort: Int = System.getProperty("udp.port").ifBlank { "9192" }.toInt()
+    val tcpPort: Int = System.getProperty("tcp.port").ifBlank { "9193" }.toInt()
 
     companion object {
         // List of reliable public STUN servers

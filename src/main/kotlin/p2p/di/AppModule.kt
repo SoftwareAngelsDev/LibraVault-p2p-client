@@ -5,6 +5,9 @@ import p2p.helpers.ConfigurationManager
 import p2p.helpers.FilePodDecoder
 import p2p.helpers.FilePodEncoder
 import p2p.helpers.RemotePeerReputationManager
+import p2p.network.client.Client
+import p2p.network.client.ClientTransmitter
+import p2p.network.client.UdpClientTransmitter
 import p2p.utils.Logger
 
 /**
@@ -16,4 +19,7 @@ val appModule = module {
     single { ConfigurationManager() }
     single { FilePodEncoder(get(), get(), get()) }
     single { FilePodDecoder(get(), get(), get()) }
+    
+    // Network components  
+    single { Client(get(), get(), get()) }
 }

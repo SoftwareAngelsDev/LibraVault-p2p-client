@@ -26,7 +26,7 @@ class HeyMessageHandler(
         )
     }
 
-    override fun handle(
+    override suspend fun handle(
         type: NetworkMessageType,
         peerNetworkInfo: PeerNetworkInfo,
         sequenceNumber: Long,

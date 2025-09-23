@@ -16,11 +16,13 @@ class Client(
     private val logger: LoggerInterface,
     private val remotePeerReputationManager: RemotePeerReputationManager,
 ) {
+    private val transmitter: ClientTransmitter = UdpClientTransmitter(configs, logger, this)
+
     private val handlers = HashMap<NetworkMessageType, NetworkMessageHandler>()
     private val knownPeers = ConcurrentHashMap<PeerPublicKey, PeerNetworkInfo>()
 
     fun getKnownPeers(): Map<PeerPublicKey, PeerNetworkInfo> {
-        return HashMap(knownPeers)
+        return knownPeers
     }
 
     fun addKnownPeer(peer: PeerNetworkInfo) {
@@ -40,19 +42,38 @@ class Client(
         messageHandler.setClientInstance(this)
     }
 
-    fun transmit(type: NetworkMessageType, destination: PeerNetworkInfo, payload: ByteArray) {
-// Sends the message to the peer
+    suspend fun transmit(type: NetworkMessageType, destination: PeerNetworkInfo, payload: ByteArray) {
+        transmitter.transmit(type, destination, payload)
     }
 
     fun start() {
-// Listens for UDP messages in port from configs
+        transmitter.start()
+        logger.info("Client", "Client started successfully")
     }
 
     fun stop() {
-// Closes the socket
+        transmitter.stop()
+        logger.info("Client", "Client stopped successfully")
     }
 
-    fun handle(message: NetworkMessage) {
+    internal suspend fun handleMessage(message: NetworkMessage) {
+        // Update peer info if it has changed
+        val known = knownPeers[message.peerNetworkInfo.id]
+        if (known != null) {
+            if (known.publicIp != message.peerNetworkInfo.publicIp || known.publicPort != message.peerNetworkInfo.publicPort) {
+                logger.info(
+                    "Client",
+                    "Peer ${message.peerNetworkInfo.id} has changed IP or port - ${known.publicIp}:${known.publicPort} -> ${message.peerNetworkInfo.publicIp}:${message.peerNetworkInfo.publicPort}"
+                )
+                knownPeers[message.peerNetworkInfo.id] = PeerNetworkInfo(
+                    id = message.peerNetworkInfo.id,
+                    publicIp = message.peerNetworkInfo.publicIp,
+                    publicPort = message.peerNetworkInfo.publicPort,
+                    version = known.version
+                )
+            }
+        }
+
         val handler = handlers[message.type]
         if (handler == null) {
             logger.error("Client", "No handler found for message: $message")

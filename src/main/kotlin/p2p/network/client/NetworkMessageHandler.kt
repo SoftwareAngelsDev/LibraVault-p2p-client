@@ -6,7 +6,7 @@ import p2p.network.client.messages.NetworkMessageType
 interface NetworkMessageHandler {
     fun setClientInstance(c: Client)
     fun canHandle(): Set<NetworkMessageType>
-    fun handle(
+    suspend fun handle(
         type: NetworkMessageType,
         peerNetworkInfo: PeerNetworkInfo,
         sequenceNumber: Long,
