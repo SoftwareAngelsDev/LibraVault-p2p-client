@@ -2,12 +2,11 @@ package p2p.network.client.messages
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import p2p.domain.PeerPublicKey
+import p2p.domain.wtfs.PeerPublicKey
 import p2p.helpers.ConfigurationManager
 import p2p.network.PeerNetworkInfo
 import p2p.network.client.Client
 import p2p.network.client.NetworkMessageHandler
-import p2p.network.client.messages.CantHandleMessage
 import p2p.utils.LoggerInterface
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -87,7 +86,7 @@ class PingPongMessageHandler(
     private fun isMuted(id: PeerPublicKey): Boolean {
         // In order to save bandwidth, only even nodes will ping
         // If the last byte of the public key is odd, then it will not ping
-        return id.last().toInt() % 2 != 0
+        return id.toByteArray().last().toInt() % 2 != 0
     }
 
     override suspend fun handle(

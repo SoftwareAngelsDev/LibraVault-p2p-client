@@ -35,22 +35,26 @@ class HeyMessageHandler(
     ) {
         when (type) {
             NetworkMessageType.HEY_BRO -> {
-                val version: Int = payload.copyOfRange(0, Int.SIZE_BYTES).toInt()
+                try {
+                    val version: Int = payload.copyOfRange(0, Int.SIZE_BYTES).toInt()
 
-                client.addKnownPeer(
-                    PeerNetworkInfo(
-                        peerNetworkInfo.id,
-                        peerNetworkInfo.publicIp,
-                        peerNetworkInfo.publicPort,
-                        version
+                    client.addKnownPeer(
+                        PeerNetworkInfo(
+                            peerNetworkInfo.id,
+                            peerNetworkInfo.publicIp,
+                            peerNetworkInfo.publicPort,
+                            version
+                        )
                     )
-                )
 
-                client.transmit(
-                    NetworkMessageType.SUP,
-                    peerNetworkInfo,
-                    mergeByteArrays(configs.publicKey, VERSION.toByteArray())
-                )
+                    client.transmit(
+                        NetworkMessageType.SUP,
+                        peerNetworkInfo,
+                        mergeByteArrays(configs.publicKey, VERSION.toByteArray())
+                    )
+                } catch (e: Exception) {
+                    throw InvalidPayloadException(e)
+                }
             }
 
             else -> throw CantHandleMessage(type)

@@ -1,6 +1,8 @@
 package p2p.network.client
 
-import p2p.domain.PeerPublicKey
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import p2p.domain.wtfs.PeerPublicKey
 import p2p.helpers.ConfigurationManager
 import p2p.helpers.RemotePeerReputationManager
 import p2p.network.PeerNetworkInfo
@@ -20,19 +22,32 @@ class Client(
 
     private val handlers = HashMap<NetworkMessageType, NetworkMessageHandler>()
     private val knownPeers = ConcurrentHashMap<PeerPublicKey, PeerNetworkInfo>()
+    private val activityListeners = HashSet<ActivityListener>()
+
+    fun addActivityListener(listener: ActivityListener) {
+        activityListeners.add(listener)
+    }
 
     fun getKnownPeers(): Map<PeerPublicKey, PeerNetworkInfo> {
         return knownPeers
     }
 
-    fun addKnownPeer(peer: PeerNetworkInfo) {
+    suspend fun addKnownPeer(peer: PeerNetworkInfo) {
+        val old = knownPeers[peer.id]
+        if (old != null && old.sameNetworkAddressAs(peer)) {
+            // Peer is already known
+            return
+        }
+
         knownPeers[peer.id] = peer
+        activityListeners.forEach { it.onPeerAdded(peer) }
         logger.info(this::javaClass.name, "New peer added: $peer")
     }
 
-    fun removeKnownPeer(peerId: PeerPublicKey) {
+    suspend fun removeKnownPeer(peerId: PeerPublicKey) {
         val removed = knownPeers.remove(peerId)
         if (removed != null) {
+            activityListeners.forEach { it.onPeerRemoved(removed) }
             logger.info(this::javaClass.name, "Peer removed: $removed")
         }
     }
@@ -43,7 +58,13 @@ class Client(
     }
 
     suspend fun transmit(type: NetworkMessageType, destination: PeerNetworkInfo, payload: ByteArray) {
-        transmitter.transmit(type, destination, payload)
+        withContext(Dispatchers.IO) {
+            try {
+                transmitter.transmit(type, destination, payload)
+            } catch (t: Throwable) {
+                logger.error(this::javaClass.name, "Failed to transmit message: ${t.stackTraceToString()}")
+            }
+        }
     }
 
     fun start() {
@@ -87,5 +108,10 @@ class Client(
             message.timestamp,
             message.payload
         )
+    }
+
+    interface ActivityListener {
+        suspend fun onPeerAdded(peer: PeerNetworkInfo) {}
+        suspend fun onPeerRemoved(peer: PeerNetworkInfo) {}
     }
 }

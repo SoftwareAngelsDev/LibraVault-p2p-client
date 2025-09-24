@@ -25,4 +25,7 @@ enum class NetworkMessageType {
     // Keep Alive
     PING,
     PONG,
+
+    // Gossiping
+    SHARE_PEER,
 }

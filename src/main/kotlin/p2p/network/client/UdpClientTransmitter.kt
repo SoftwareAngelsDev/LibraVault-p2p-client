@@ -1,9 +1,8 @@
 package p2p.network.client
 
 import kotlinx.coroutines.*
-import p2p.domain.KEY_SIZE_BYTES
 import p2p.domain.PeerSignature
-import p2p.domain.SIGNATURE_SIZE_BYTES
+import p2p.domain.wtfs.PeerPublicKey
 import p2p.helpers.ConfigurationManager
 import p2p.network.PeerNetworkInfo
 import p2p.network.client.messages.NetworkMessage
@@ -34,116 +33,110 @@ class UdpClientTransmitter(
         private const val MAX_RECOVERY_ATTEMPTS = 2
 
         // Message format
-        private val MESSAGE_TYPE_SIZE = Int.SIZE_BYTES // Int for enum ordinal
-        private val TIMESTAMP_SIZE = Long.SIZE_BYTES   // Long
-        private val SEQUENCE_SIZE = Long.SIZE_BYTES    // Long
-        private val SIGNATURE_SIZE = SIGNATURE_SIZE_BYTES // RSA 4096 signature
-        private val PEER_ID_SIZE = KEY_SIZE_BYTES   // RSA 4096 public key
-        private val PAYLOAD_SIZE_SIZE = Int.SIZE_BYTES // Int for payload length
+        private val MESSAGE_TYPE_SIZE = Int.SIZE_BYTES
+        private val TIMESTAMP_SIZE = Long.SIZE_BYTES
+        private val SEQUENCE_SIZE = Long.SIZE_BYTES
+        private val SIGNATURE_SIZE = PeerPublicKey.SIZE_BYTES
+        private val PEER_ID_SIZE = PeerPublicKey.SIZE_BYTES
+        private val PAYLOAD_SIZE_SIZE = Int.SIZE_BYTES
         private const val VERSION = 1
     }
 
     override suspend fun transmit(type: NetworkMessageType, destination: PeerNetworkInfo, payload: ByteArray) {
-        transmitWithRecovery(type, destination, payload)
-    }
-
-    private suspend fun transmitWithRecovery(
-        type: NetworkMessageType,
-        destination: PeerNetworkInfo,
-        payload: ByteArray
-    ) {
-        // Check preconditions and throw exceptions instead of returning
-        if (!isRunning.get()) {
-            val errorMsg = "Cannot transmit message - transmitter is not running"
-            logger.error("UdpClientTransmitter", errorMsg)
-            throw TransmitterNotRunningException(errorMsg)
-        }
-
-        repeat(MAX_RECOVERY_ATTEMPTS + 1) { attempt ->
-            val socket = udpSocket ?: run {
-                if (attempt == MAX_RECOVERY_ATTEMPTS) {
-                    val errorMsg =
-                        "Cannot transmit message - UDP socket is not initialized after $MAX_RECOVERY_ATTEMPTS recovery attempts"
-                    logger.error("UdpClientTransmitter", errorMsg)
-                    throw SocketNotInitializedException(errorMsg)
-                }
-
-                // Attempt regenerative recovery
-                logger.warn(
-                    "UdpClientTransmitter",
-                    "Socket not initialized, attempting regenerative recovery (attempt ${attempt + 1}/${MAX_RECOVERY_ATTEMPTS + 1})"
-                )
-
-                // Grace period to avoid flooding
-                delay(SOCKET_RECOVERY_GRACE_PERIOD_MS)
-
-                // Try to recover the socket
-                if (!attemptSocketRecovery()) {
-                    val errorMsg = "Socket recovery failed - cannot reinitialize UDP socket"
-                    logger.error("UdpClientTransmitter", errorMsg)
-                    throw SocketNotInitializedException(errorMsg)
-                }
-
-                logger.info("UdpClientTransmitter", "Socket recovery successful, retrying transmission")
-                udpSocket!! // We know it's not null after successful recovery
+        withContext(Dispatchers.IO) {
+            // Check preconditions and throw exceptions instead of returning
+            if (!isRunning.get()) {
+                val errorMsg = "Cannot transmit message - transmitter is not running"
+                logger.error("UdpClientTransmitter", errorMsg)
+                throw TransmitterNotRunningException(errorMsg)
             }
 
-            try {
-                // Create message with signature placeholder first
-                val timestamp = System.currentTimeMillis()
-                val sequenceNum = sequenceNumber.incrementAndGet()
+            repeat(MAX_RECOVERY_ATTEMPTS + 1) { attempt ->
+                val socket = udpSocket ?: run {
+                    if (attempt == MAX_RECOVERY_ATTEMPTS) {
+                        val errorMsg =
+                            "Cannot transmit message - UDP socket is not initialized after $MAX_RECOVERY_ATTEMPTS recovery attempts"
+                        logger.error("UdpClientTransmitter", errorMsg)
+                        throw SocketNotInitializedException(errorMsg)
+                    }
 
-                // Create actual signature for the message data
-                val messageData = mergeByteArrays(
-                    type.ordinal.toByteArray(),
-                    timestamp.toByteArray(),
-                    sequenceNum.toByteArray(),
-                    payload
-                )
-                val signature = createSignature(messageData)
+                    // Attempt regenerative recovery
+                    logger.warn(
+                        "UdpClientTransmitter",
+                        "Socket not initialized, attempting regenerative recovery (attempt ${attempt + 1}/${MAX_RECOVERY_ATTEMPTS + 1})"
+                    )
 
-                // Create final message with actual signature
-                val finalMessage = NetworkMessage(type, payload, destination, timestamp, sequenceNum, signature)
+                    // Grace period to avoid flooding
+                    delay(SOCKET_RECOVERY_GRACE_PERIOD_MS)
 
-                // Serialize message to bytes - this is non-blocking
-                val messageBytes = try {
-                    serializeMessage(finalMessage)
+                    // Try to recover the socket
+                    if (!attemptSocketRecovery()) {
+                        val errorMsg = "Socket recovery failed - cannot reinitialize UDP socket"
+                        logger.error("UdpClientTransmitter", errorMsg)
+                        throw SocketNotInitializedException(errorMsg)
+                    }
+
+                    logger.info("UdpClientTransmitter", "Socket recovery successful, retrying transmission")
+                    udpSocket!! // We know it's not null after successful recovery
+                }
+
+                try {
+                    // Create message with signature placeholder first
+                    val timestamp = System.currentTimeMillis()
+                    val sequenceNum = sequenceNumber.incrementAndGet()
+
+                    // Create actual signature for the message data
+                    val messageData = mergeByteArrays(
+                        type.ordinal.toByteArray(),
+                        timestamp.toByteArray(),
+                        sequenceNum.toByteArray(),
+                        payload
+                    )
+                    val signature = createSignature(messageData)
+
+                    // Create final message with actual signature
+                    val finalMessage = NetworkMessage(type, payload, destination, timestamp, sequenceNum, signature)
+
+                    // Serialize message to bytes - this is non-blocking
+                    val messageBytes = try {
+                        serializeMessage(finalMessage)
+                    } catch (e: Exception) {
+                        val errorMsg =
+                            "Failed to serialize message for transmission to ${destination.publicIp}:${destination.publicPort}"
+                        logger.error("UdpClientTransmitter", "$errorMsg - ${e.message}")
+                        throw MessageSerializationException(errorMsg, e)
+                    }
+
+                    // Create UDP packet and send - non-blocking with coroutine context switch
+                    val address = InetAddress.getByName(destination.publicIp)
+                    val packet = DatagramPacket(
+                        messageBytes,
+                        messageBytes.size,
+                        address,
+                        destination.publicPort.toInt()
+                    )
+
+                    // Use IO dispatcher for non-blocking network operation
+                    withContext(Dispatchers.IO) {
+                        socket.send(packet)
+                    }
+
+                    logger.info(
+                        "UdpClientTransmitter",
+                        "Message sent to ${destination.publicIp}:${destination.publicPort} - Type: $type, Size: ${messageBytes.size} bytes"
+                    )
+
+                    return@withContext // Success - exit retry loop
+
+                } catch (e: ClientTransmitterException) {
+                    // Re-throw our custom exceptions (don't retry these)
+                    throw e
                 } catch (e: Exception) {
-                    val errorMsg =
-                        "Failed to serialize message for transmission to ${destination.publicIp}:${destination.publicPort}"
+                    // Wrap any other exceptions in our custom exception
+                    val errorMsg = "Failed to transmit message to ${destination.publicIp}:${destination.publicPort}"
                     logger.error("UdpClientTransmitter", "$errorMsg - ${e.message}")
-                    throw MessageSerializationException(errorMsg, e)
+                    throw TransmissionFailedException(errorMsg, e)
                 }
-
-                // Create UDP packet and send - non-blocking with coroutine context switch
-                val address = InetAddress.getByName(destination.publicIp)
-                val packet = DatagramPacket(
-                    messageBytes,
-                    messageBytes.size,
-                    address,
-                    destination.publicPort.toInt()
-                )
-
-                // Use IO dispatcher for non-blocking network operation
-                withContext(Dispatchers.IO) {
-                    socket.send(packet)
-                }
-
-                logger.info(
-                    "UdpClientTransmitter",
-                    "Message sent to ${destination.publicIp}:${destination.publicPort} - Type: $type, Size: ${messageBytes.size} bytes"
-                )
-
-                return // Success - exit retry loop
-
-            } catch (e: ClientTransmitterException) {
-                // Re-throw our custom exceptions (don't retry these)
-                throw e
-            } catch (e: Exception) {
-                // Wrap any other exceptions in our custom exception
-                val errorMsg = "Failed to transmit message to ${destination.publicIp}:${destination.publicPort}"
-                logger.error("UdpClientTransmitter", "$errorMsg - ${e.message}")
-                throw TransmissionFailedException(errorMsg, e)
             }
         }
     }
@@ -251,58 +244,60 @@ class UdpClientTransmitter(
     }
 
     private suspend fun listenForMessages() {
-        val socket = udpSocket ?: return
-        val buffer = ByteArray(65536) // 64KB buffer for UDP packets
+        withContext(Dispatchers.IO) {
+            val socket = udpSocket ?: return@withContext
+            val buffer = ByteArray(65536) // 64KB buffer for UDP packets
 
-        while (isRunning.get() && !socket.isClosed) {
-            try {
-                val packet = DatagramPacket(buffer, buffer.size)
-
-                withContext(Dispatchers.IO) {
-                    socket.receive(packet)
-                }
-
-                // Extract actual message bytes
-                val messageBytes = packet.data.sliceArray(0 until packet.length)
-
-                logger.debug(
-                    "UdpClientTransmitter",
-                    "Received UDP packet from ${packet.address}:${packet.port}, size: ${packet.length} bytes"
-                )
-
-                // Deserialize and handle message
+            while (isRunning.get() && !socket.isClosed) {
                 try {
-                    val senderAddress = packet.address.hostAddress
-                    val senderPort = packet.port.toShort()
-                    val message = deserializeMessage(messageBytes, senderAddress, senderPort)
+                    val packet = DatagramPacket(buffer, buffer.size)
 
-                    // Skip processing if message is not intended for us
-                    @Suppress("FoldInitializerAndIfToElvis")
-                    if (message == null) {
-                        continue
+                    withContext(Dispatchers.IO) {
+                        socket.receive(packet)
                     }
 
-                    // Validate message signature (placeholder for now)
-                    // TODO: Implement proper signature verification
+                    // Extract actual message bytes
+                    val messageBytes = packet.data.sliceArray(0 until packet.length)
 
-                    // Handle the message using the provided handler
-                    client.handleMessage(message)
-                } catch (e: Exception) {
-                    logger.error(
+                    logger.debug(
                         "UdpClientTransmitter",
-                        "Failed to deserialize message from ${packet.address}:${packet.port} - ${e.message}"
+                        "Received UDP packet from ${packet.address}:${packet.port}, size: ${packet.length} bytes"
                     )
-                }
 
-            } catch (e: Exception) {
-                if (isRunning.get() && !socket.isClosed) {
-                    logger.error("UdpClientTransmitter", "Error receiving UDP packet: ${e.message}")
-                    delay(100) // Brief delay before retrying
+                    // Deserialize and handle message
+                    try {
+                        val senderAddress = packet.address.hostAddress
+                        val senderPort = packet.port.toShort()
+                        val message = deserializeMessage(messageBytes, senderAddress, senderPort)
+
+                        // Skip processing if message is not intended for us
+                        @Suppress("FoldInitializerAndIfToElvis")
+                        if (message == null) {
+                            continue
+                        }
+
+                        // Validate message signature (placeholder for now)
+                        // TODO: Implement proper signature verification
+
+                        // Handle the message using the provided handler
+                        client.handleMessage(message)
+                    } catch (e: Exception) {
+                        logger.error(
+                            "UdpClientTransmitter",
+                            "Failed to deserialize message from ${packet.address}:${packet.port} - ${e.message}"
+                        )
+                    }
+
+                } catch (e: Exception) {
+                    if (isRunning.get() && !socket.isClosed) {
+                        logger.error("UdpClientTransmitter", "Error receiving UDP packet: ${e.message}")
+                        delay(100) // Brief delay before retrying
+                    }
                 }
             }
-        }
 
-        logger.info("UdpClientTransmitter", "Stopped listening for UDP messages")
+            logger.info("UdpClientTransmitter", "Stopped listening for UDP messages")
+        }
     }
 
     /**

@@ -1,13 +1,15 @@
 package p2p.helpers
 
-import java.util.Base64
+import p2p.domain.wtfs.PeerPrivateKey
+import p2p.domain.wtfs.PeerPublicKey
+import java.util.*
 
 class ConfigurationManager {
     val repositoryAbsolutePath: String = System.getProperty("user.dir")
-    val privateKey: ByteArray = Base64.getDecoder().decode(System.getProperty("user.key"))
-    val publicKey = privateKey // TODO: Generate public key from private key
-    val udpPort: Int = System.getProperty("udp.port").ifBlank { "9192" }.toInt()
-    val tcpPort: Int = System.getProperty("tcp.port").ifBlank { "9193" }.toInt()
+    val privateKey = PeerPrivateKey(Base64.getDecoder().decode(System.getProperty("user.key")))
+    val publicKey = PeerPublicKey(ByteArray(PeerPrivateKey.SIZE_BYTES)) // TODO: Generate public key from private key
+    val udpPort = System.getProperty("udp.port").ifBlank { "9192" }.toInt()
+    val tcpPort = System.getProperty("tcp.port").ifBlank { "9193" }.toInt()
 
     companion object {
         // List of reliable public STUN servers
