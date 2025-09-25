@@ -111,7 +111,7 @@ class Client(
     }
 
     interface ActivityListener {
-        suspend fun onPeerAdded(peer: PeerNetworkInfo) {}
-        suspend fun onPeerRemoved(peer: PeerNetworkInfo) {}
+        suspend fun onPeerAdded(addedPeer: PeerNetworkInfo) {}
+        suspend fun onPeerRemoved(removedPeer: PeerNetworkInfo) {}
     }
 }

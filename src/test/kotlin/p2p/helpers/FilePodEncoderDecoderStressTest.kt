@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import p2p.domain.wtfs.FileId
 import p2p.domain.wtfs.FilePod
 import p2p.domain.wtfs.INode
+import p2p.domain.wtfs.PeerPublicKey
 import kotlin.math.min
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -18,7 +19,7 @@ class FilePodEncoderDecoderStressTest {
     private lateinit var decoder: FilePodDecoder
 
     // Sample owner key (512 bytes for RSA 4096)
-    private val ownerKey = ByteArray(512) { it.toByte() }
+    private val ownerKey = PeerPublicKey(ByteArray(512) { it.toByte() })
 
     @BeforeEach
     fun setUp() {

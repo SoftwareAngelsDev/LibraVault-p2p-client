@@ -50,7 +50,7 @@ class HeyMessageHandler(
                     client.transmit(
                         NetworkMessageType.SUP,
                         peerNetworkInfo,
-                        mergeByteArrays(configs.publicKey, VERSION.toByteArray())
+                        mergeByteArrays(configs.publicKey.toByteArray(), VERSION.toByteArray())
                     )
                 } catch (e: Exception) {
                     throw InvalidPayloadException(e)

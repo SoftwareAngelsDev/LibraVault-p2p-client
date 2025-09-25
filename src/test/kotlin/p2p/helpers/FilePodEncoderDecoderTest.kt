@@ -10,6 +10,7 @@ import p2p.domain.wtfs.FileContent
 import p2p.domain.wtfs.FileId
 import p2p.domain.wtfs.FilePod
 import p2p.domain.wtfs.INode
+import p2p.domain.wtfs.PeerPublicKey
 import p2p.utils.toByteArray
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -22,12 +23,12 @@ class FilePodEncoderDecoderTest {
     private lateinit var decoder: FilePodDecoder
 
     // Sample owner key (512 bytes for RSA 4096)
-    private val ownerKey = ByteArray(512) { it.toByte() }
+    private val ownerKey = PeerPublicKey(ByteArray(512) { it.toByte() })
 
     // Sample file content
     private val sampleTextContent = "This is a test file for the FilePod encoder/decoder.\n" +
             "It contains some plain text to verify encoding works correctly."
-    
+
     // Test file metadata
     private val testFiles = mutableMapOf<String, Pair<ByteArray, Boolean>>() // Map of filename to (content, isPublic)
 
@@ -76,7 +77,7 @@ class FilePodEncoderDecoderTest {
         val (decoded, _) = decoder.decode(encoded)
         assertEquals(emptyPod.number, decoded.number, "Pod number should be preserved")
         assertEquals(0, decoded.iNodes.size, "Decoded pod should have no files")
-        assertTrue(ownerKey.contentEquals(decoded.owner), "Owner key should be preserved")
+        assertEquals(ownerKey, decoded.owner, "Owner key should be preserved")
     }
 
     @Test
@@ -85,7 +86,7 @@ class FilePodEncoderDecoderTest {
         val filename = "test_public.txt"
         val fileContent = testFiles[filename]!!.first
         val fileMap = mapOf(filename to fileContent)
-        
+
         val pod = createTestPod(listOf(filename), podNumber = 2)
 
         // Encode and test
@@ -98,7 +99,7 @@ class FilePodEncoderDecoderTest {
         val filename = "test_private.txt"
         val fileContent = testFiles[filename]!!.first
         val fileMap = mapOf(filename to fileContent)
-        
+
         val pod = createTestPod(listOf(filename), podNumber = 3)
 
         // Encode and test
@@ -120,7 +121,7 @@ class FilePodEncoderDecoderTest {
         // Create content that's too large
         val filename = "too_large.bin"
         val largeContent = ByteArray(FilePod.POD_FIXED_SIZE_BYTES) { 1 } // This will definitely be too large
-        
+
         // Create an INode for this file
         val inode = INode(
             path = filename,
@@ -129,7 +130,7 @@ class FilePodEncoderDecoderTest {
             contentLength = largeContent.size,
             contentHash = calculateHash(largeContent)
         )
-        
+
         // Create a pod with this file
         val pod = FilePod(
             number = 5,
@@ -137,7 +138,7 @@ class FilePodEncoderDecoderTest {
             iNodes = listOf(inode),
             updatedAt = System.currentTimeMillis()
         )
-        
+
         // This should throw an exception because the pod is too large
         assertThrows<IllegalArgumentException> {
             encoder.encode(pod, mapOf(filename to largeContent))
@@ -176,7 +177,7 @@ class FilePodEncoderDecoderTest {
             decoder.decode(invalidSizeBytes)
         }
     }
-    
+
     @Test
     fun `test mixed empty and non-empty files`() = runTest {
         // Prepare a mix of empty files and files with content
@@ -190,29 +191,29 @@ class FilePodEncoderDecoderTest {
             "mixed_small.txt",             // New small file
             "mixed_medium.dat"             // New medium-sized file
         )
-        
+
         // Create additional files needed for the test
         testFiles["mixed_empty_1.txt"] = ByteArray(0) to true
         testFiles["mixed_empty_2.txt"] = ByteArray(0) to true
         testFiles["mixed_small.txt"] = "Small mixed test content".encodeToByteArray() to true
         testFiles["mixed_medium.dat"] = ByteArray(5000) { (it % 128).toByte() } to true
-        
+
         // Create the file content map
         val fileMap = mixedFilenames.associateWith { filename ->
             testFiles[filename]!!.first
         }
-        
+
         // Create a pod with these files
         val pod = createTestPod(mixedFilenames, podNumber = 7)
-        
+
         // Encode and test
         testEncodingAndDecoding(pod, fileMap, mixedFilenames)
-        
+
         // Additional verification: check that empty files are indeed empty
         val emptyFiles = listOf("test_empty.txt", "mixed_empty_1.txt", "mixed_empty_2.txt")
         val decoderResult = decoder.decode(encoder.encode(pod, fileMap))
         val decodedContents = decoderResult.second
-        
+
         emptyFiles.forEach { filename ->
             assertEquals(0, decodedContents[filename]!!.size, "Empty file should have size 0: $filename")
         }
@@ -220,20 +221,21 @@ class FilePodEncoderDecoderTest {
 
     private fun createTestFiles() {
         // Create a variety of test file contents in memory
-        
+
         // 1. Small text file (public)
         testFiles["test_public.txt"] = sampleTextContent.encodeToByteArray() to true
-        
+
         // 2. Small text file (private)
-        testFiles["test_private.txt"] = (sampleTextContent + "\nThis file should be encrypted").encodeToByteArray() to false
-        
+        testFiles["test_private.txt"] =
+            (sampleTextContent + "\nThis file should be encrypted").encodeToByteArray() to false
+
         // 3. Binary file with random data
         val binaryContent = ByteArray(1024) { (it % 256).toByte() }
         testFiles["test_binary.bin"] = binaryContent to true
-        
+
         // 4. Empty file
         testFiles["test_empty.txt"] = ByteArray(0) to true
-        
+
         // 5. Larger file (10KB)
         val largerContent = ByteArray(10 * 1024) { (it % 256).toByte() }
         testFiles["test_larger.dat"] = largerContent to true
@@ -276,8 +278,8 @@ class FilePodEncoderDecoderTest {
     private fun calculateHash(bytes: ByteArray): Int {
         return bytes.fold(0) { acc, byte -> (acc * 31 + byte.toInt()) }
     }
-    
-    
+
+
     /**
      * Creates a test pod with the specified filenames
      */
@@ -285,7 +287,7 @@ class FilePodEncoderDecoderTest {
         val inodes = filenames.map { filename ->
             val (content, isPublic) = testFiles[filename]!!
             val contentHash = calculateHash(content)
-            
+
             INode(
                 path = filename,
                 isPublic = isPublic,
@@ -302,23 +304,27 @@ class FilePodEncoderDecoderTest {
             updatedAt = System.currentTimeMillis()
         )
     }
-    
+
     /**
      * Tests encoding and decoding a pod and verifies the decoded content
      */
-    private suspend fun testEncodingAndDecoding(pod: FilePod, fileContents: Map<FileId, FileContent>, filenames: List<String>) {
+    private suspend fun testEncodingAndDecoding(
+        pod: FilePod,
+        fileContents: Map<FileId, FileContent>,
+        filenames: List<String>
+    ) {
         // Encode and decode
         val encoded = encoder.encode(pod, fileContents)
         assertNotNull(encoded, "Encoded bytes should not be null")
         if (filenames.isNotEmpty()) {
             assertEquals(FilePod.POD_FIXED_SIZE_BYTES, encoded.size, "Encoded pod should match fixed size")
         }
-        
+
         val decoderResult = decoder.decode(encoded)
         val decoded = decoderResult.first
         val decodedContents = decoderResult.second
         assertEquals(pod.iNodes.size, decoded.iNodes.size, "Decoded pod should have correct number of files")
-        
+
         // Verify all files were correctly decoded
         filenames.forEach { filename ->
             val decodedContent = decodedContents[filename]

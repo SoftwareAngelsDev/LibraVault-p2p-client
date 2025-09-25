@@ -1,5 +1,6 @@
 package p2p.domain.wtfs
 
+import p2p.domain.RemotePeerId
 import p2p.utils.convertMBToBytes
 
 typealias PodNumber = Int
@@ -7,7 +8,7 @@ typealias UnixTimestamp = Long
 typealias FilePodEncoded = ByteArray
 
 class FilePod(
-    val owner: p2p.domain.RemotePeerId,
+    val owner: RemotePeerId,
     val number: PodNumber,
     val iNodes: Collection<INode>,
     val updatedAt: UnixTimestamp

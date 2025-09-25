@@ -1,11 +1,8 @@
 package p2p.helpers
 
-import p2p.domain.wtfs.FileContent
+import p2p.domain.wtfs.*
 import p2p.domain.wtfs.FileContentHash
 import p2p.domain.wtfs.FileContentLengthBytes
-import p2p.domain.wtfs.FileId
-import p2p.domain.wtfs.FilePod
-import p2p.domain.wtfs.INode
 import p2p.helpers.FilePodEncoder.Companion.NUMBER_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.OWNER_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.RESERVED_BITS_MASK
@@ -70,7 +67,7 @@ class FilePodDecoder(
         }
 
         // Extract header components
-        val owner = bytes.sliceArray(OWNER_OFFSET until NUMBER_OFFSET)
+        val owner = PeerPublicKey(bytes.sliceArray(OWNER_OFFSET until NUMBER_OFFSET))
         val numberBytes = bytes.sliceArray(NUMBER_OFFSET until UPDATED_AT_OFFSET)
         val updatedAtBytes = bytes.sliceArray(UPDATED_AT_OFFSET until SIGNATURE_OFFSET)
         val signature = bytes.sliceArray(SIGNATURE_OFFSET until FILES_SECTION_OFFSET)

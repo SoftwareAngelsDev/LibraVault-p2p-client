@@ -33,12 +33,12 @@ class UdpClientTransmitter(
         private const val MAX_RECOVERY_ATTEMPTS = 2
 
         // Message format
-        private val MESSAGE_TYPE_SIZE = Int.SIZE_BYTES
-        private val TIMESTAMP_SIZE = Long.SIZE_BYTES
-        private val SEQUENCE_SIZE = Long.SIZE_BYTES
-        private val SIGNATURE_SIZE = PeerPublicKey.SIZE_BYTES
-        private val PEER_ID_SIZE = PeerPublicKey.SIZE_BYTES
-        private val PAYLOAD_SIZE_SIZE = Int.SIZE_BYTES
+        private const val MESSAGE_TYPE_SIZE = Int.SIZE_BYTES
+        private const val TIMESTAMP_SIZE = Long.SIZE_BYTES
+        private const val SEQUENCE_SIZE = Long.SIZE_BYTES
+        private const val SIGNATURE_SIZE = PeerPublicKey.SIZE_BYTES
+        private const val PEER_ID_SIZE = PeerPublicKey.SIZE_BYTES
+        private const val PAYLOAD_SIZE_SIZE = Int.SIZE_BYTES
         private const val VERSION = 1
     }
 
@@ -320,8 +320,8 @@ class UdpClientTransmitter(
             message.type.ordinal.toByteArray(),
             message.timestamp.toByteArray(),
             message.sequenceNumber.toByteArray(),
-            configs.publicKey,
-            message.peerNetworkInfo.id, // 512 bytes
+            configs.publicKey.toByteArray(),
+            message.peerNetworkInfo.id.toByteArray(),
             message.payload.size.toByteArray(),
             message.payload,
             message.signature // 512 bytes
@@ -350,15 +350,15 @@ class UdpClientTransmitter(
         offset += SEQUENCE_SIZE
 
         // Source Peer ID (512 bytes) - who sent this message
-        val sourcePeerId = bytes.sliceArray(offset until offset + PEER_ID_SIZE)
+        val sourcePeerId = PeerPublicKey(bytes.sliceArray(offset until offset + PEER_ID_SIZE))
         offset += PEER_ID_SIZE
 
         // Destination Peer ID (512 bytes) - who this message is for
-        val destinationPeerId = bytes.sliceArray(offset until offset + PEER_ID_SIZE)
+        val destinationPeerId = PeerPublicKey(bytes.sliceArray(offset until offset + PEER_ID_SIZE))
         offset += PEER_ID_SIZE
 
         // Check if this message is intended for us - if not, ignore it
-        if (!destinationPeerId.contentEquals(configs.publicKey)) {
+        if (destinationPeerId != configs.publicKey) {
             logger.debug(
                 "UdpClientTransmitter",
                 "Ignoring message from $senderAddress:$senderPort - not intended for us"

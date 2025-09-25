@@ -9,7 +9,6 @@ import p2p.domain.RemotePeerReputation
 import p2p.network.Punishment
 import p2p.network.Reward
 import p2p.utils.LoggerInterface
-import java.util.*
 
 class RemotePeerReputationManager(private val logger: LoggerInterface) {
     companion object {
@@ -41,7 +40,7 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
 
         logger.debug(
             TAG,
-            "Decreased peer reputation for ${peerId.prettyPrint()}: ${oldPeerInfo.score} -> $newReputation"
+            "Decreased peer reputation for $peerId: ${oldPeerInfo.score} -> $newReputation"
         )
     }
 
@@ -58,14 +57,14 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
 
         logger.debug(
             TAG,
-            "Increased peer reputation for ${peerId.prettyPrint()}: ${oldPeerInfo.score} -> $newReputation"
+            "Increased peer reputation for $peerId: ${oldPeerInfo.score} -> $newReputation"
         )
     }
 
     suspend fun registerSuccessfulConnection(peerId: RemotePeerId) = withContext(Dispatchers.IO) {
         val currentTime = System.currentTimeMillis()
         val peerInfo = getPeerReputation(peerId)
-        
+
         if (peerInfo == null) {
             val newPeer = RemotePeerReputation(
                 remotePeerId = peerId,
@@ -83,7 +82,7 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
     suspend fun registerFailedConnection(peerId: RemotePeerId) = withContext(Dispatchers.IO) {
         val currentTime = System.currentTimeMillis()
         val peerInfo = getPeerReputation(peerId)
-        
+
         if (peerInfo == null) {
             val newPeer = RemotePeerReputation(
                 remotePeerId = peerId,
@@ -97,11 +96,11 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
             peerRepository.incrementFailedConnections(peerId, currentTime)
         }
     }
-    
+
     suspend fun blockPeer(peerId: RemotePeerId) = withContext(Dispatchers.IO) {
         val peerInfo = getPeerReputation(peerId)
         val currentTime = System.currentTimeMillis()
-        
+
         if (peerInfo == null) {
             val newPeer = RemotePeerReputation(
                 remotePeerId = peerId,
@@ -111,17 +110,17 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
                 lastSeen = currentTime
             )
             peerRepository.insertPeerReputation(newPeer)
-            logger.info(TAG, "New peer created and blocked: ${peerId.prettyPrint()}")
+            logger.info(TAG, "New peer created and blocked: $peerId")
         } else {
             peerRepository.blockPeer(peerId, currentTime)
-            logger.info(TAG, "Peer blocked: ${peerId.prettyPrint()}")
+            logger.info(TAG, "Peer blocked: $peerId")
         }
     }
-    
+
     suspend fun unblockPeer(peerId: RemotePeerId) = withContext(Dispatchers.IO) {
         val peerInfo = getPeerReputation(peerId)
         val currentTime = System.currentTimeMillis()
-        
+
         if (peerInfo == null) {
             val newPeer = RemotePeerReputation(
                 remotePeerId = peerId,
@@ -130,26 +129,20 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
                 lastSeen = currentTime
             )
             peerRepository.insertPeerReputation(newPeer)
-            logger.info(TAG, "New peer created (not blocked): ${peerId.prettyPrint()}")
+            logger.info(TAG, "New peer created (not blocked): $peerId")
         } else {
             peerRepository.unblockPeer(peerId, currentTime)
-            logger.info(TAG, "Peer unblocked: ${peerId.prettyPrint()}")
+            logger.info(TAG, "Peer unblocked: $peerId")
         }
     }
-    
+
     suspend fun getBlockedPeers(): List<RemotePeerReputation> = withContext(Dispatchers.IO) {
         peerRepository.getBlockedPeers()
     }
-    
+
     suspend fun isPeerBlocked(peerId: RemotePeerId): Boolean = withContext(Dispatchers.IO) {
         val peerInfo = getPeerReputation(peerId)
         peerInfo?.isBlocked ?: false
-    }
-
-    private fun RemotePeerId.prettyPrint(): String {
-        return Base64.getUrlEncoder().encodeToString(this).let {
-            it.take(5) + "..." + it.takeLast(5)
-        }
     }
 
     private suspend fun addNewRemotePeer(peerId: RemotePeerId): RemotePeerReputation = withContext(Dispatchers.IO) {

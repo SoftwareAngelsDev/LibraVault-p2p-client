@@ -132,7 +132,7 @@ class FilePodEncoder(
         val encodedUpdatedAt = filePod.updatedAt.toByteArray()
 
         return mergeByteArrays(
-            filePod.owner,
+            filePod.owner.toByteArray(),
             encodedNumber,
             encodedUpdatedAt,
             sign(createSigningData(encodedNumber, encodedUpdatedAt, encodedFiles, padding)),

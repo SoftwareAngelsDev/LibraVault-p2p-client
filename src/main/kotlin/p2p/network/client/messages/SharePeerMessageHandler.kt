@@ -29,16 +29,16 @@ class SharePeerMessageHandler(
         this.client = client
         client.addActivityListener(
             object : Client.ActivityListener {
-                override suspend fun onPeerAdded(added: PeerNetworkInfo) {
+                override suspend fun onPeerAdded(addedPeer: PeerNetworkInfo) {
                     val peers = client.getKnownPeers().values
 
                     // Share added peer with all known peers
-                    if (!wasRecentlyBroadcasted(added.id)) {
+                    if (!wasRecentlyBroadcasted(addedPeer.id)) {
                         peers.forEach { p ->
                             client.transmit(
                                 type = NetworkMessageType.SHARE_PEER,
                                 destination = p,
-                                payload = createPayload(added),
+                                payload = createPayload(addedPeer),
                             )
                         }
                     }
@@ -47,7 +47,7 @@ class SharePeerMessageHandler(
                     peers.forEach { p ->
                         client.transmit(
                             type = NetworkMessageType.SHARE_PEER,
-                            destination = added,
+                            destination = addedPeer,
                             payload = createPayload(p),
                         )
                     }
