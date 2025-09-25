@@ -6,6 +6,7 @@ import p2p.domain.wtfs.PeerPublicKey
 import p2p.helpers.ConfigurationManager
 import p2p.helpers.RemotePeerReputationManager
 import p2p.network.PeerNetworkInfo
+import p2p.network.UNSET_VERSION
 import p2p.network.client.messages.NetworkMessage
 import p2p.network.client.messages.NetworkMessageType
 import p2p.utils.LoggerInterface
@@ -34,21 +35,33 @@ class Client(
 
     suspend fun addKnownPeer(peer: PeerNetworkInfo) {
         val old = knownPeers[peer.id]
-        if (old != null && old.sameNetworkAddressAs(peer)) {
-            // Peer is already known
-            return
+        if (old != null) {
+            if (old.sameNetworkAddressAs(peer)) {
+                // Peer is already known
+                return
+            } else {
+                logger.info(
+                    "Client",
+                    "Peer ${peer.id} has changed IP or port - ${old.publicIp}:${old.publicPort} -> ${peer.publicIp}:${peer.publicPort}"
+                )
+            }
         }
 
-        knownPeers[peer.id] = peer
+        val version = if (peer.version == UNSET_VERSION)
+            old?.version ?: throw IllegalArgumentException("Peer version is unset")
+        else
+            peer.version
+
+        knownPeers[peer.id] = peer.copy(version = version)
         activityListeners.forEach { it.onPeerAdded(peer) }
-        logger.info(this::javaClass.name, "New peer added: $peer")
+        logger.info(this.javaClass.simpleName, "New peer added: $peer")
     }
 
     suspend fun removeKnownPeer(peerId: PeerPublicKey) {
         val removed = knownPeers.remove(peerId)
         if (removed != null) {
             activityListeners.forEach { it.onPeerRemoved(removed) }
-            logger.info(this::javaClass.name, "Peer removed: $removed")
+            logger.info(this.javaClass.simpleName, "Peer removed: $removed")
         }
     }
 
@@ -62,37 +75,38 @@ class Client(
             try {
                 transmitter.transmit(type, destination, payload)
             } catch (t: Throwable) {
-                logger.error(this::javaClass.name, "Failed to transmit message: ${t.stackTraceToString()}")
+                logger.error(this.javaClass.simpleName, "Failed to transmit message: ${t.stackTraceToString()}")
             }
         }
     }
 
     fun start() {
         transmitter.start()
-        logger.info("Client", "Client started successfully")
+        logger.info("Client", "Client started successfully ${getNetworkIdentity()}")
     }
 
     fun stop() {
         transmitter.stop()
-        logger.info("Client", "Client stopped successfully")
+        logger.info("Client", "Client stopped successfully ${getNetworkIdentity()}")
+    }
+
+    private fun getNetworkIdentity(): String {
+        val peerId = configs.publicKey.toString().take(10) + "..."
+        return "(Port: ${configs.udpPort}, ID: $peerId)"
     }
 
     internal suspend fun handleMessage(message: NetworkMessage) {
         // Update peer info if it has changed
-        val known = knownPeers[message.peerNetworkInfo.id]
-        if (known != null) {
-            if (known.publicIp != message.peerNetworkInfo.publicIp || known.publicPort != message.peerNetworkInfo.publicPort) {
-                logger.info(
-                    "Client",
-                    "Peer ${message.peerNetworkInfo.id} has changed IP or port - ${known.publicIp}:${known.publicPort} -> ${message.peerNetworkInfo.publicIp}:${message.peerNetworkInfo.publicPort}"
-                )
-                knownPeers[message.peerNetworkInfo.id] = PeerNetworkInfo(
+        val shouldUpdatePeerInfo = knownPeers[message.peerNetworkInfo.id] != null
+        if (shouldUpdatePeerInfo) {
+            addKnownPeer(
+                PeerNetworkInfo(
                     id = message.peerNetworkInfo.id,
                     publicIp = message.peerNetworkInfo.publicIp,
                     publicPort = message.peerNetworkInfo.publicPort,
-                    version = known.version
+                    version = UNSET_VERSION
                 )
-            }
+            )
         }
 
         val handler = handlers[message.type]

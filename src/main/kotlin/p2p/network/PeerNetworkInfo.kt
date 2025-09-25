@@ -2,6 +2,8 @@ package p2p.network
 
 import p2p.domain.wtfs.PeerPublicKey
 
+const val UNSET_VERSION = 0
+
 data class PeerNetworkInfo(
     val id: PeerPublicKey,
     val publicIp: String,

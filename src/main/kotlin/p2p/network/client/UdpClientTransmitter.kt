@@ -5,6 +5,7 @@ import p2p.domain.PeerSignature
 import p2p.domain.wtfs.PeerPublicKey
 import p2p.helpers.ConfigurationManager
 import p2p.network.PeerNetworkInfo
+import p2p.network.UNSET_VERSION
 import p2p.network.client.messages.NetworkMessage
 import p2p.network.client.messages.NetworkMessageType
 import p2p.utils.*
@@ -377,8 +378,10 @@ class UdpClientTransmitter(
         // Signature (512 bytes)
         val signature = bytes.sliceArray(offset until offset + SIGNATURE_SIZE)
 
+        val version = client.getKnownPeers()[sourcePeerId]?.version ?: UNSET_VERSION
+
         // Create PeerNetworkInfo for the sender using packet header information
-        val peerNetworkInfo = PeerNetworkInfo(sourcePeerId, senderAddress, senderPort, VERSION)
+        val peerNetworkInfo = PeerNetworkInfo(sourcePeerId, senderAddress, senderPort, version)
 
         return NetworkMessage(messageType, payload, peerNetworkInfo, timestamp, sequenceNumber, signature)
     }

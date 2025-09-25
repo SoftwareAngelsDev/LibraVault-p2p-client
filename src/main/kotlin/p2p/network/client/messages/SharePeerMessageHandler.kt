@@ -7,6 +7,7 @@ import p2p.network.PeerNetworkInfo
 import p2p.network.client.Client
 import p2p.network.client.NetworkMessageHandler
 import p2p.utils.*
+import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 
 class SharePeerMessageHandler(
@@ -32,9 +33,9 @@ class SharePeerMessageHandler(
                 override suspend fun onPeerAdded(addedPeer: PeerNetworkInfo) {
                     val peers = client.getKnownPeers().values
 
-                    // Share added peer with all known peers
-                    if (!wasRecentlyBroadcasted(addedPeer.id)) {
-                        peers.forEach { p ->
+                    // Share added peer with all known peers except the added peer itself
+                    if (!wasRecentlyBroadcasted(addedPeer.id) || isMyself(addedPeer.id)) {
+                        peers.filter { p -> p.id != addedPeer.id }.forEach { p ->
                             client.transmit(
                                 type = NetworkMessageType.SHARE_PEER,
                                 destination = p,
@@ -43,8 +44,8 @@ class SharePeerMessageHandler(
                         }
                     }
 
-                    // Share all known peers with the added peer
-                    peers.forEach { p ->
+                    // Share all the other peers I know with the added peer
+                    peers.filter { p -> p.id != addedPeer.id }.forEach { p ->
                         client.transmit(
                             type = NetworkMessageType.SHARE_PEER,
                             destination = addedPeer,
@@ -71,9 +72,12 @@ class SharePeerMessageHandler(
     ) {
         when (type) {
             NetworkMessageType.SHARE_PEER -> {
-                val receivedPeer: PeerNetworkInfo = parsePayload(payload)
+                val receivedPeer = parsePayload(payload)
 
-                client.addKnownPeer(receivedPeer)
+                // Don't add ourselves to our known peers
+                if (!isMyself(receivedPeer.id)) {
+                    client.addKnownPeer(receivedPeer)
+                }
             }
 
             else -> throw CantHandleMessage(type)
@@ -82,17 +86,23 @@ class SharePeerMessageHandler(
 
     private fun parsePayload(payload: ByteArray): PeerNetworkInfo {
         try {
-            val id = PeerPublicKey(payload.copyOfRange(0, RemotePeerId.SIZE_BYTES))
-            val publicIp =
-                String(payload.copyOfRange(RemotePeerId.SIZE_BYTES, RemotePeerId.SIZE_BYTES + Int.SIZE_BYTES))
-            val publicPort = payload.copyOfRange(
-                RemotePeerId.SIZE_BYTES + Int.SIZE_BYTES,
-                RemotePeerId.SIZE_BYTES + Int.SIZE_BYTES + Short.SIZE_BYTES
-            ).toShort()
-            val version = payload.copyOfRange(
-                RemotePeerId.SIZE_BYTES + Int.SIZE_BYTES + Short.SIZE_BYTES,
-                RemotePeerId.SIZE_BYTES + Int.SIZE_BYTES + Short.SIZE_BYTES + Int.SIZE_BYTES
-            ).toInt()
+            var offset = 0
+
+            // Read peer ID (512 bytes)
+            val id = PeerPublicKey(payload.copyOfRange(offset, offset + RemotePeerId.SIZE_BYTES))
+            offset += RemotePeerId.SIZE_BYTES
+
+            // Read IP address (4 bytes for IPv4)
+            val ipBytes = payload.copyOfRange(offset, offset + 4)
+            val publicIp = InetAddress.getByAddress(ipBytes).hostAddress
+            offset += 4
+
+            // Read port (2 bytes)
+            val publicPort = payload.copyOfRange(offset, offset + Short.SIZE_BYTES).toShort()
+            offset += Short.SIZE_BYTES
+
+            // Read version (4 bytes)
+            val version = payload.copyOfRange(offset, offset + Int.SIZE_BYTES).toInt()
 
             return PeerNetworkInfo(id, publicIp, publicPort, version)
         } catch (e: Exception) {
@@ -100,12 +110,17 @@ class SharePeerMessageHandler(
         }
     }
 
-    fun createPayload(added: PeerNetworkInfo): ByteArray {
+    private fun createPayload(added: PeerNetworkInfo): ByteArray {
+        val ipBytes = InetAddress.getByName(added.publicIp).address  // Convert IP to 4 bytes
         return mergeByteArrays(
-            added.id.toByteArray(),
-            added.publicIp.toByteArray(),
-            added.publicPort.toByteArray(),
-            added.version.toByteArray(),
+            added.id.toByteArray(),        // 512 bytes
+            ipBytes,                       // 4 bytes (IPv4)
+            added.publicPort.toByteArray(), // 2 bytes
+            added.version.toByteArray(),   // 4 bytes
         )
+    }
+
+    private fun isMyself(id: PeerPublicKey): Boolean {
+        return id == configs.publicKey
     }
 }
