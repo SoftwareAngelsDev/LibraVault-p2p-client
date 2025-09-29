@@ -8,6 +8,7 @@ import p2p.domain.wtfs.FileId
 import p2p.domain.wtfs.FilePod
 import p2p.domain.wtfs.INode
 import p2p.domain.wtfs.PeerPublicKey
+import java.util.*
 import kotlin.math.min
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -23,6 +24,13 @@ class FilePodEncoderDecoderStressTest {
 
     @BeforeEach
     fun setUp() {
+        // Set up system properties for ConfigurationManager
+        val testPrivateKey = ByteArray(512) { it.toByte() } // 512-byte test key (required by PeerPrivateKey)
+        val encodedKey = Base64.getEncoder().encodeToString(testPrivateKey)
+        System.setProperty("user.key", encodedKey)
+        System.setProperty("udp.port", "9192")
+        System.setProperty("tcp.port", "9193")
+        
         // Create configuration manager with a dummy repository path
         configurationManager = ConfigurationManager()
 
@@ -42,7 +50,10 @@ class FilePodEncoderDecoderStressTest {
 
     @AfterEach
     fun tearDown() {
-        // Nothing to clean up since we don't use the filesystem
+        // Clean up system properties to avoid test pollution
+        System.clearProperty("user.key")
+        System.clearProperty("udp.port")
+        System.clearProperty("tcp.port")
     }
 
     @Test
