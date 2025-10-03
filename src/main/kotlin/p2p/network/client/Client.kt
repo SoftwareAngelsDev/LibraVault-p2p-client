@@ -2,7 +2,9 @@ package p2p.network.client
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import p2p.database.repositories.PodsRepository
 import p2p.domain.wtfs.PeerPublicKey
+import p2p.domain.wtfs.PodMetadata
 import p2p.helpers.ConfigurationManager
 import p2p.helpers.RemotePeerReputationManager
 import p2p.network.PeerNetworkInfo
@@ -18,6 +20,7 @@ class Client(
     private val configs: ConfigurationManager,
     private val logger: LoggerInterface,
     private val remotePeerReputationManager: RemotePeerReputationManager,
+    private val podsRepository: PodsRepository,
 ) {
     private val transmitter: ClientTransmitter = UdpClientTransmitter(configs, logger, this)
 
@@ -122,6 +125,10 @@ class Client(
             message.timestamp,
             message.payload
         )
+    }
+
+    suspend fun addPod(receivedPod: PodMetadata) {
+        podsRepository.upsertPod(receivedPod)
     }
 
     interface ActivityListener {

@@ -11,6 +11,8 @@ class FilePodMerkleTreeHelper {
     companion object {
         val CHUNK_SIZE_BYTES: Int = ceil(POD_FIXED_SIZE_BYTES / 100.0).toInt()
 
+        const val MERKLE_HASH_ROOT_SIZE_BYTES = 32 // SHA-256
+
         private fun sha256(data: ByteArray): ByteArray =
             MessageDigest.getInstance("SHA-256").digest(data)
 

@@ -28,4 +28,5 @@ enum class NetworkMessageType {
 
     // Gossiping
     SHARE_PEER,
+    SHARE_POD,
 }

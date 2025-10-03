@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import p2p.database.schema.RemotePeersTable
+import p2p.database.schema.PodsTable
 import p2p.utils.LoggerInterface
 import java.sql.Connection
 import java.util.*
@@ -37,7 +38,7 @@ class DatabaseConfig(private val logger: LoggerInterface) {
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
         
         transaction(database) {
-            SchemaUtils.create(RemotePeersTable)
+            SchemaUtils.create(RemotePeersTable, PodsTable)
             logger.info(TAG, "Database schema created or verified")
         }
     }
@@ -45,8 +46,8 @@ class DatabaseConfig(private val logger: LoggerInterface) {
     fun cleanDatabase() {
         if (System.getProperty("test.database") == "true") {
             transaction(database) {
-                SchemaUtils.drop(RemotePeersTable)
-                SchemaUtils.create(RemotePeersTable)
+                SchemaUtils.drop(RemotePeersTable, PodsTable)
+                SchemaUtils.create(RemotePeersTable, PodsTable)
                 logger.info(TAG, "Test database cleaned")
             }
         }

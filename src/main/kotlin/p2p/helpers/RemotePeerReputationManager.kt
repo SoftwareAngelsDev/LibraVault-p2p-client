@@ -3,7 +3,7 @@ package p2p.helpers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import p2p.database.config.DatabaseConfig
-import p2p.database.repositories.PeerReputationRepository
+import p2p.database.repositories.RemotePeerReputationRepository
 import p2p.domain.RemotePeerId
 import p2p.domain.RemotePeerReputation
 import p2p.network.Punishment
@@ -17,7 +17,7 @@ class RemotePeerReputationManager(private val logger: LoggerInterface) {
     }
 
     private val dbConfig = DatabaseConfig(logger)
-    private val peerRepository = PeerReputationRepository(dbConfig, logger)
+    private val peerRepository = RemotePeerReputationRepository(dbConfig, logger)
 
     suspend fun getKnownRemotePeers(): Map<RemotePeerId, RemotePeerReputation> = withContext(Dispatchers.IO) {
         peerRepository.getAllPeers()

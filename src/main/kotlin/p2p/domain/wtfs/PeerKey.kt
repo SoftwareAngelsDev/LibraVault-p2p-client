@@ -1,16 +1,16 @@
 package p2p.domain.wtfs
 
-import java.util.*
+import p2p.utils.prettyPrint
 
 abstract class PeerKey(
     private val key: ByteArray,
 ) {
     companion object {
-        const val SIZE_BYTES = 512
+        const val SIZE_BYTES = 512 // RSA 4096 key size
     }
 
     init {
-        require(key.size == SIZE_BYTES) { "Key must be $SIZE_BYTES bytes long" }
+        require(key.size == SIZE_BYTES) { "Key must be $SIZE_BYTES bytes long, not ${key.size}" }
     }
 
     fun toByteArray(): ByteArray {
@@ -30,13 +30,7 @@ abstract class PeerKey(
         return key.contentHashCode()
     }
 
-    override fun toString(): String {
-        Base64.getEncoder().encodeToString(key).let {
-            val firstChars = it.take(5)
-            val lastChars = it.takeLast(5)
-            return "$firstChars...$lastChars"
-        }
-    }
+    override fun toString() = key.prettyPrint()
 }
 
 class PeerPublicKey(key: ByteArray) : PeerKey(key) {

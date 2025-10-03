@@ -8,6 +8,7 @@ import p2p.domain.wtfs.FileId
 import p2p.domain.wtfs.FilePod
 import p2p.domain.wtfs.INode
 import p2p.domain.wtfs.PeerPublicKey
+import java.security.MessageDigest
 import java.util.*
 import kotlin.math.min
 import kotlin.test.assertEquals
@@ -30,7 +31,7 @@ class FilePodEncoderDecoderStressTest {
         System.setProperty("user.key", encodedKey)
         System.setProperty("udp.port", "9192")
         System.setProperty("tcp.port", "9193")
-        
+
         // Create configuration manager with a dummy repository path
         configurationManager = ConfigurationManager()
 
@@ -253,7 +254,7 @@ class FilePodEncoderDecoderStressTest {
             // All files are public for simplicity in these tests
             val isPublic = true
             val fileContent = content(fileId)
-            val contentHash = calculateHash(fileContent)
+            val contentHash = calculateINodeContentHash(fileContent)
 
             INode(
                 path = fileId,
@@ -300,10 +301,5 @@ class FilePodEncoderDecoderStressTest {
     private fun mockVerify(data: ByteArray, signature: ByteArray): Boolean {
         val expectedSignature = mockSign(data)
         return signature.contentEquals(expectedSignature)
-    }
-
-    // Calculate a simple hash of byte array
-    private fun calculateHash(bytes: ByteArray): Int {
-        return bytes.fold(0) { acc, byte -> (acc * 31 + byte.toInt()) }
     }
 }

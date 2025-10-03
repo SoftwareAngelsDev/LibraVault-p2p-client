@@ -5,9 +5,6 @@ import p2p.domain.wtfs.PeerPublicKey
 typealias PeerSignature = ByteArray // 4096 bits = 512 bytes
 typealias RemotePeerId = PeerPublicKey
 
-const val KEY_SIZE_BYTES = 512
-const val SIGNATURE_SIZE_BYTES = 512
-
 data class RemotePeer(
     val publicKey: PeerPublicKey,
 ) {

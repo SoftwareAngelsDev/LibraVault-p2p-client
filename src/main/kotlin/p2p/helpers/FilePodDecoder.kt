@@ -1,8 +1,8 @@
 package p2p.helpers
 
 import p2p.domain.wtfs.*
-import p2p.domain.wtfs.FileContentHash
 import p2p.domain.wtfs.FileContentLengthBytes
+import p2p.helpers.FilePodEncoder.Companion.HASH_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.NUMBER_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.OWNER_SIZE_BYTES
 import p2p.helpers.FilePodEncoder.Companion.RESERVED_BITS_MASK
@@ -52,7 +52,7 @@ class FilePodDecoder(
 
         // File entry constants
         private val PATH_LENGTH_SIZE_BYTES = Int.SIZE_BYTES
-        private val CONTENT_HASH_SIZE_BYTES = FileContentHash.SIZE_BYTES
+        private val CONTENT_HASH_SIZE_BYTES = HASH_SIZE_BYTES
         private val CONTENT_LENGTH_SIZE_BYTES = FileContentLengthBytes.SIZE_BYTES
 
         private val FILE_RESERVED_BITS_BYTES = 1
@@ -139,13 +139,14 @@ class FilePodDecoder(
             val updatedAt = encodedFiles.sliceArray(position until position + TIMESTAMP_SIZE_BYTES).toLong()
             position += TIMESTAMP_SIZE_BYTES
 
-            // Read content metadata
+            // Read content hash
             val contentHash = encodedFiles.sliceArray(position until position + CONTENT_HASH_SIZE_BYTES).toInt()
             position += CONTENT_HASH_SIZE_BYTES
+
+            // Read content
             val contentLength = encodedFiles.sliceArray(position until position + CONTENT_LENGTH_SIZE_BYTES).toInt()
             position += CONTENT_LENGTH_SIZE_BYTES
 
-            // Read content
             val content = if (contentLength > 0) {
                 encodedFiles.sliceArray(position until position + contentLength)
             } else {
@@ -163,8 +164,8 @@ class FilePodDecoder(
                     reserved = reserved,
                     createdAt = createdAt,
                     updatedAt = updatedAt,
+                    contentHash = contentHash,
                     contentLength = contentLength,
-                    contentHash = contentHash
                 )
             )
 

@@ -1,13 +1,13 @@
 package p2p.helpers
 
 import p2p.domain.wtfs.*
-import p2p.domain.wtfs.FileContentHash
 import p2p.domain.wtfs.FileContentLengthBytes
 import p2p.domain.wtfs.FileReservedMetadata
 import p2p.domain.wtfs.PodNumber
 import p2p.domain.wtfs.UnixTimestamp
 import p2p.utils.mergeByteArrays
 import p2p.utils.toByteArray
+import java.security.MessageDigest
 import kotlin.experimental.and
 import kotlin.math.max
 
@@ -44,10 +44,11 @@ class FilePodEncoder(
 ) {
     companion object {
         // Header constants
-        val OWNER_SIZE_BYTES = 512 // RSA 4096 key size
+        val OWNER_SIZE_BYTES = PeerPublicKey.SIZE_BYTES // RSA 4096 key size
         val NUMBER_SIZE_BYTES = PodNumber.SIZE_BYTES  // PodNumber is Int
         val TIMESTAMP_SIZE_BYTES = UnixTimestamp.SIZE_BYTES
-        val SIGNATURE_SIZE_BYTES = 512 // RSA 4096 signature size
+        val SIGNATURE_SIZE_BYTES = PeerPublicKey.SIZE_BYTES // RSA 4096 signature size
+        val HASH_SIZE_BYTES = Int.SIZE_BYTES
         val HEADER_SIZE_BYTES = OWNER_SIZE_BYTES + NUMBER_SIZE_BYTES + TIMESTAMP_SIZE_BYTES + SIGNATURE_SIZE_BYTES
 
         val RESERVED_BITS_MASK = 0x7F.toByte()
@@ -91,8 +92,8 @@ class FilePodEncoder(
                 val updatedAt = inode.updatedAt.toByteArray()
 
                 val contentHash = inode.contentHash.toByteArray()
-                val contentLength = inode.contentLength.toByteArray()
 
+                val contentLength = inode.contentLength.toByteArray()
                 val content = contents[inode.fileId]!!.let {
                     if (it.size != inode.contentLength) {
                         throw IllegalStateException("File content length (${it.size}) doesn't match inode content length (${inode.contentLength})")
@@ -145,13 +146,17 @@ class FilePodEncoder(
         return FileReservedMetadata.SIZE_BYTES + // metadata byte
                 encodedPath.size + // actual path bytes
                 UnixTimestamp.SIZE_BYTES * 2 + // timestamps (createdAt, updatedAt)
-                FileContentLengthBytes.SIZE_BYTES + // content hash
-                FileContentHash.SIZE_BYTES    // content length
+                FileContentLengthBytes.SIZE_BYTES + // content length
+                HASH_SIZE_BYTES // content hash
     }
 
     fun calculateFileSize(isPublic: Boolean, path: String, content: FileContent): Int {
         return calculateINodeSize(isPublic, path) + (if (isPublic) content else encrypt(content)).size
     }
+}
+
+internal fun calculateINodeContentHash(bytes: ByteArray): Int {
+    return bytes.fold(0) { acc, byte -> (acc * 31 + byte.toInt()) }
 }
 
 internal fun createSigningData(

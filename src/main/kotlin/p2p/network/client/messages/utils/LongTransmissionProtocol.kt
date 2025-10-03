@@ -13,12 +13,13 @@ class LongTransmissionProtocol(
     companion object {
         private const val MAX_CHUNK_BYTES = Short.MAX_VALUE
         private const val LOOP_INTERVAL_MILLIS = 10L
+        private const val DEFAULT_TIMEOUT_SECS: Short = 800
     }
 
     private val confirmedChunks = BitSet()
     private val confirmedCount = AtomicInteger(0)
 
-    suspend fun process(timeoutSecs: Short = 600) {
+    suspend fun process(timeoutSecs: Short = DEFAULT_TIMEOUT_SECS) {
         withTimeoutOrNull(timeoutSecs * 1000L) {
             val chunkNumber = ceil(message.size / MAX_CHUNK_BYTES.toDouble()).toInt()
 

@@ -5,13 +5,9 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.junit.jupiter.api.io.TempDir
-import p2p.domain.wtfs.FileContent
-import p2p.domain.wtfs.FileId
-import p2p.domain.wtfs.FilePod
-import p2p.domain.wtfs.INode
-import p2p.domain.wtfs.PeerPublicKey
+import p2p.domain.wtfs.*
 import p2p.utils.toByteArray
+import java.security.MessageDigest
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -41,7 +37,7 @@ class FilePodEncoderDecoderTest {
         System.setProperty("user.key", encodedKey)
         System.setProperty("udp.port", "9192")
         System.setProperty("tcp.port", "9193")
-        
+
         // Create configuration manager with a dummy repository path
         configurationManager = ConfigurationManager()
 
@@ -139,7 +135,7 @@ class FilePodEncoderDecoderTest {
             isPublic = true,
             reserved = 0,
             contentLength = largeContent.size,
-            contentHash = calculateHash(largeContent)
+            contentHash = calculateINodeContentHash(largeContent)
         )
 
         // Create a pod with this file
@@ -272,7 +268,7 @@ class FilePodEncoderDecoderTest {
 
     // Mock signing that just returns a 512-byte signature based on the hash
     private fun mockSign(bytes: ByteArray): ByteArray {
-        val hashBytes = calculateHash(bytes).toByteArray()
+        val hashBytes = calculateINodeContentHash(bytes).toByteArray()
 
         return ByteArray(512) {
             if (it < hashBytes.size) hashBytes[it] else it.toByte()
@@ -285,19 +281,13 @@ class FilePodEncoderDecoderTest {
         return signature.contentEquals(expectedSignature)
     }
 
-    // Calculate a simple hash of byte array
-    private fun calculateHash(bytes: ByteArray): Int {
-        return bytes.fold(0) { acc, byte -> (acc * 31 + byte.toInt()) }
-    }
-
-
     /**
      * Creates a test pod with the specified filenames
      */
     private fun createTestPod(filenames: List<String>, podNumber: Int): FilePod {
         val inodes = filenames.map { filename ->
             val (content, isPublic) = testFiles[filename]!!
-            val contentHash = calculateHash(content)
+            val contentHash = calculateINodeContentHash(content)
 
             INode(
                 path = filename,

@@ -1,9 +1,10 @@
 package p2p.database.schema
 
 import org.jetbrains.exposed.sql.Table
+import p2p.domain.wtfs.PeerPublicKey
 
 object RemotePeersTable : Table("remote_peers") {
-    val id = binary("id", 512)
+    val id = binary("id", PeerPublicKey.SIZE_BYTES * 8)
     val score = double("score")
     val successfulConnections = integer("successful_connections").default(0)
     val failedConnections = integer("failed_connections").default(0)

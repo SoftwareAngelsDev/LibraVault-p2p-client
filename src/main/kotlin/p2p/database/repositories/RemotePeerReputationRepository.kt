@@ -1,10 +1,8 @@
 package p2p.database.repositories
 
-import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 import p2p.database.config.DatabaseConfig
 import p2p.database.schema.RemotePeersTable
@@ -13,18 +11,12 @@ import p2p.domain.RemotePeerReputation
 import p2p.domain.wtfs.PeerPublicKey
 import p2p.utils.LoggerInterface
 
-class PeerReputationRepository(
-    private val dbConfig: DatabaseConfig,
-    private val logger: LoggerInterface
-) {
-    companion object {
-        private const val TAG = "PeerReputationRepository"
-    }
-
-    private suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO, db = dbConfig.database) {
-            block()
-        }
+class RemotePeerReputationRepository(
+    dbConfig: DatabaseConfig,
+    logger: LoggerInterface
+) : BaseRepository(dbConfig, logger) {
+    
+    override val TAG = "PeerReputationRepository"
 
     private fun resultRowToReputation(row: ResultRow): RemotePeerReputation {
         return RemotePeerReputation(
@@ -130,11 +122,4 @@ class PeerReputationRepository(
             .map(::resultRowToReputation)
     }
 
-    suspend fun cleanDatabase(): Unit = dbQuery {
-        dbConfig.cleanDatabase()
-    }
-
-    private fun ByteArray.toHexString(): String {
-        return this.joinToString("") { "%02x".format(it) }.take(16) + "..."
-    }
 }
